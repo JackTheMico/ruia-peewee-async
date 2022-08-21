@@ -1,0 +1,9 @@
+version: '3.3'
+services:
+    run:
+        container_name: mysql
+        ports:
+            - '3306:3306'
+        environment:
+            - MYSQL_ROOT_PASSWORD=abc123
+        image: run
