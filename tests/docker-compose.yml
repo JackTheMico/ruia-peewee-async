@@ -1,9 +1,16 @@
 version: '3.3'
 services:
-    run:
+    mysql:
         container_name: mysql
         ports:
-            - '3306:3306'
+            - '33060:3306'
         environment:
             - MYSQL_ROOT_PASSWORD=abc123
-        image: run
+        image: 'mysql:latest'
+    postgres:
+        container_name: postgres
+        ports:
+            - '54321:5432'
+        environment:
+            - POSTGRES_PASSWORD=abc123
+        image: 'postgres:latest'
