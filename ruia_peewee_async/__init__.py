@@ -1,18 +1,10 @@
 # -*- coding: utf-8 -*-
 from enum import Enum
 from types import MethodType
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
-from typing import Union
+from typing import Dict, List, Optional, Tuple, Union
 
-from peewee import DoesNotExist
-from peewee import Model
-from peewee import Query
-from peewee_async import Manager
-from peewee_async import MySQLDatabase
-from peewee_async import PostgresqlDatabase
+from peewee import DoesNotExist, Model, Query
+from peewee_async import Manager, MySQLDatabase, PostgresqlDatabase
 from pymysql import OperationalError
 from ruia import Spider
 from ruia.exceptions import SpiderHookError
@@ -96,20 +88,20 @@ class RuiaPeeweeUpdate:
                 spider_ins.postgres_model, query, defaults=data
             )
             if not created:
-                model_ins.__data__ = data
+                model_ins.__data__.update(data)
                 await spider_ins.postgres_manager.update(model_ins, only=only)
         elif database == TargetDB.BOTH:
             model_ins, created = await spider_ins.mysql_manager.get_or_create(
                 spider_ins.mysql_model, query, defaults=data
             )
             if not created:
-                model_ins.__data__ = data
+                model_ins.__data__.update(data)
                 await spider_ins.mysql_manager.update(model_ins, only=only)
             model_ins, created = await spider_ins.postgres_manager.get_or_create(
                 spider_ins.postgres_model, query, defaults=data
             )
             if not created:
-                model_ins.__data__ = data
+                model_ins.__data__.update(data)
                 await spider_ins.postgres_manager.update(model_ins, only=only)
         else:
             raise ValueError(f"TargetDB Enum value error: {database}")

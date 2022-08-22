@@ -17,6 +17,9 @@ pytest = "^7.1.2"
 pdbpp = "^0.10.3"
 pylint = "^2.14.5"
 pytest-docker = "^1.0.0"
+cryptography = "^37.0.4"
+pytest-asyncio = "^0.19.0"
+pytest-dependency = "^0.5.1"
 
 [tool.poetry.extras]
 aiomysql = ["aiomysql"]
@@ -27,6 +30,7 @@ log_cli = true
 log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+asyncio_mode = "auto"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
