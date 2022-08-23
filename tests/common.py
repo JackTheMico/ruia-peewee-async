@@ -6,7 +6,7 @@ from ruia import AttrField, Item, Middleware, Response, TextField
 from ruia_peewee_async import RuiaPeeweeInsert, RuiaPeeweeUpdate, Spider, TargetDB
 
 
-class HackerNewsItem(Item):
+class DoubanItem(Item):
     target_item = TextField(css_select="tr.item")
     title = AttrField(css_select="a.nbg", attr="title")
     url = AttrField(css_select="a.nbg", attr="href")
@@ -15,16 +15,16 @@ class HackerNewsItem(Item):
         return value.strip()
 
 
-class HackerNewsSpider(Spider):
+class DoubanSpider(Spider):
     start_urls = ["https://movie.douban.com/chart"]
     # aiohttp_kwargs = {"proxy": "http://127.0.0.1:7890"}
 
     async def parse(self, response: Response):
-        async for item in HackerNewsItem.get_items(html=await response.text()):
+        async for item in DoubanItem.get_items(html=await response.text()):
             yield item
 
 
-class Insert(HackerNewsSpider):
+class Insert(DoubanSpider):
     def __init__(
         self,
         middleware: typing.Union[typing.Iterable, Middleware] = None,
@@ -44,7 +44,7 @@ class Insert(HackerNewsSpider):
             yield RuiaPeeweeInsert(item.results, database=self.target_db)
 
 
-class Update(HackerNewsSpider):
+class Update(DoubanSpider):
     def __init__(
         self,
         middleware: typing.Union[typing.Iterable, Middleware] = None,

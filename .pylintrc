@@ -91,6 +91,7 @@ disable=raw-checker-failed,
         R0903,
         R0913,
         R0916,
+        R0801
 # Enable the message, report, category or checker with the given id(s). You can
 # eithertoo-few-public-methods give multiple identifier separated by comma (,) or put this option
 # multiple time (only on the command line, not in the configuration file where

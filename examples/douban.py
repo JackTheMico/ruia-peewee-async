@@ -1,23 +1,9 @@
-# ruia-peewee-async
-
-A [Ruia](https://github.com/howie6879/ruia) plugin that uses [peewee-async](https://github.com/05bit/peewee-async) to store data to MySQL or PostgreSQL or both.
-
-
-## Installation
-
-```shell
-pip install ruia-peewee-async
-```
-
-## Usage
-
-
-```python
+# -*- coding: utf-8 -*-
 from peewee import CharField
 from ruia import AttrField, Item, Response, Spider, TextField
 
-from ruia_peewee_async import (RuiaPeeweeInsert, RuiaPeeweeUpdate, TargetDB,
-                               after_start)
+from ruia_peewee_async import RuiaPeeweeInsert, RuiaPeeweeUpdate, TargetDB, after_start
+
 
 class DoubanItem(Item):
     target_item = TextField(css_select="tr.item")
@@ -26,6 +12,7 @@ class DoubanItem(Item):
 
     async def clean_title(self, value):
         return value.strip()
+
 
 class DoubanSpider(Spider):
     start_urls = ["https://movie.douban.com/chart"]
@@ -36,6 +23,7 @@ class DoubanSpider(Spider):
             yield RuiaPeeweeInsert(item.results)  # default is MySQL
             # yield RuiaPeeweeInsert(item.results, database=TargetDB.POSTGRES) # save to Postgresql
             # yield RuiaPeeweeInsert(item.results, database=TargetDB.BOTH) # save to both MySQL and Postgresql
+
 
 class DoubanUpdateSpider(Spider):
     start_urls = ["https://movie.douban.com/chart"]
@@ -57,6 +45,7 @@ class DoubanUpdateSpider(Spider):
             # database: The target database type.
             # create_when_not_exists: If True, will create a record when data not exists. Default is True.
             # only: A list or tuple of fields that should be updated.
+
 
 mysql = {
     "host": "127.0.0.1",
@@ -88,4 +77,3 @@ if __name__ == "__main__":
     # DoubanSpider.start(after_start=after_start(postgres=postgres))
     # DoubanSpider.start(after_start=after_start(mysql=mysql, postgres=postgres))
     # DoubanUpdateSpider.start(after_start=after_start(mysql=mysql))
-```

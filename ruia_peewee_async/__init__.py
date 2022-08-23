@@ -31,6 +31,14 @@ class ParameterError(Exception):
 
 class RuiaPeeweeInsert:
     def __init__(self, data: Dict, database: TargetDB = TargetDB.MYSQL) -> None:
+        """
+
+        Args:
+            data: A data that's going to be inserted into the database.
+            database: The target database type.
+
+        """
+
         self.data = data
         self.database = database
 
@@ -71,6 +79,17 @@ class RuiaPeeweeUpdate:
         create_when_not_exists: bool = True,
         only: Optional[Union[Tuple[str], List[str]]] = None,
     ) -> None:
+        """
+
+        Args:
+            data: A dict that's going to be updated in the database.
+            query: A peewee query or a dict to search for the target data in database.
+            database: The target database type.
+            create_when_not_exists: If True, will create a record when data not exists. Default is True.
+            only: A list or tuple of fields that should be updated.
+
+        """
+
         self.data = data
         self.query = query
         self.database = database
@@ -179,7 +198,6 @@ def init_spider(*, spider_ins: Spider):
         with spider_ins.postgres_manager.allow_sync():
             spider_ins.postgres_model.create_table(True)
     spider_ins.callback_result_map = spider_ins.callback_result_map or {}
-    # MySQL Insert
     spider_ins.process_insert_callback_result = MethodType(
         RuiaPeeweeInsert.process, spider_ins
     )
@@ -192,3 +210,52 @@ def init_spider(*, spider_ins: Spider):
     spider_ins.callback_result_map.update(
         {"RuiaPeeweeUpdate": "process_update_callback_result"}
     )
+
+
+def raise_no_model(config, model, name):
+    if config and not model:
+        raise ParameterError(
+            f"""{name} must have 'model' in config and 'model' cannot be empty.
+            For example:
+                {{
+                    'host': '127.0.0.1',
+                    'port': 3306,
+                    'user': 'ruiamysql',
+                    'password': 'abc123',
+                    'database': 'ruiamysql',
+                    'model': {{
+                        'table_name': 'ruia_mysql',
+                        "title": CharField(),
+                        'url': CharField(),
+                    }},
+                }}
+                """
+        )
+
+
+def after_start(**kwargs):
+    if not kwargs:
+        raise ParameterError(
+            "There must be a 'mysql' or 'postgres' parameter or both of them."
+        )
+    mysql = kwargs.get("mysql", {})
+    postgres = kwargs.get("postgres", {})
+    if not mysql and not postgres:
+        raise ParameterError(
+            "MySQL and PostgreSQL configs cannout be empty at the same time."
+        )
+    mysql_model = mysql.pop("model", None)
+    postgres_model = postgres.pop("model", None)
+    raise_no_model(mysql, mysql_model, "MySQL")
+    raise_no_model(postgres, postgres_model, "PostgreSQL")
+
+    async def init_after_start(spider_ins):
+        if mysql and mysql_model:
+            spider_ins.mysql_config = mysql
+            spider_ins.mysql_model = mysql_model
+        if postgres and postgres_model:
+            spider_ins.postgres_config = postgres
+            spider_ins.postgres_model = postgres_model
+        init_spider(spider_ins=spider_ins)
+
+    return init_after_start

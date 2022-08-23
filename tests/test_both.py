@@ -4,7 +4,7 @@ from random import randint
 import pytest
 from peewee import CharField
 
-from ruia_peewee_async import TargetDB, init_spider
+from ruia_peewee_async import TargetDB, after_start
 
 from .common import Insert, Update
 
@@ -22,30 +22,35 @@ class BothUpdate(Update):
 
 
 def basic_setup(mysql, postgresql):
-    async def init_after_start(spider_ins):
-        spider_ins.mysql_config = mysql
-        spider_ins.mysql_model = {
-            "table_name": "ruia_mysql_both",
-            "title": CharField(),
-            "url": CharField(),
+    mysql.update(
+        {
+            "model": {
+                "table_name": "ruia_mysql",
+                "title": CharField(),
+                "url": CharField(),
+            }
         }
-        spider_ins.postgres_config = postgresql
-        spider_ins.postgres_model = {
-            "table_name": "ruia_postgres_both",
-            "title": CharField(),
-            "url": CharField(),
+    )
+    postgresql.update(
+        {
+            "model": {
+                "table_name": "ruia_postgres",
+                "title": CharField(),
+                "url": CharField(),
+            }
         }
-        init_spider(spider_ins=spider_ins)
-
-    return init_after_start
+    )
+    return mysql, postgresql
 
 
 class TestBoth:
     @pytest.mark.dependency()
     async def test_both_insert(self, mysql, postgresql, event_loop):
-        after_start = basic_setup(mysql, postgresql)
+        mysql, postgresql = basic_setup(mysql, postgresql)
         spider_ins = await BothInsert.async_start(
-            loop=event_loop, after_start=after_start, target_db=TargetDB.BOTH
+            loop=event_loop,
+            after_start=after_start(mysql=mysql, postgres=postgresql),
+            target_db=TargetDB.BOTH,
         )
         count_mysql = await spider_ins.mysql_manager.count(
             spider_ins.mysql_model.select()
@@ -58,9 +63,11 @@ class TestBoth:
 
     @pytest.mark.dependency(depends=["TestBoth::test_both_insert"])
     async def test_both_update(self, mysql, postgresql, event_loop):
-        after_start = basic_setup(mysql, postgresql)
+        mysql, postgresql = basic_setup(mysql, postgresql)
         spider_ins = await BothUpdate.async_start(
-            loop=event_loop, after_start=after_start, target_db=TargetDB.BOTH
+            loop=event_loop,
+            after_start=after_start(mysql=mysql, postgres=postgresql),
+            target_db=TargetDB.BOTH,
         )
         mysql_one = await spider_ins.mysql_manager.get(
             spider_ins.mysql_model, id=randint(1, 11)
