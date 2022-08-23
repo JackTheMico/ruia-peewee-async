@@ -15,6 +15,6 @@ services:
         ports:
             - '54321:5432'
         environment:
-            POSTGRES_USER: ruia_peewee_async
+            POSTGRES_USER: ruiapostgres
             POSTGRES_PASSWORD: abc123
         image: 'postgres:latest'

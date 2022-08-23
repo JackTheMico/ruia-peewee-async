@@ -1,37 +1,31 @@
 # -*- coding: utf-8 -*-
-from logging import getLogger
 from random import randint
 
 import pytest
 from peewee import CharField
 
-from ruia_peewee_async import RuiaPeeweeInsert, RuiaPeeweeUpdate, init_spider
+from ruia_peewee_async import init_spider
 
-from .common import HackerNewsSpider
-
-logger = getLogger(__name__)
+from .common import Insert, Update
 
 
-class MySQLInsert(HackerNewsSpider):
+class MySQLInsert(Insert):
     async def parse(self, response):
         async for item in super().parse(response):
-            yield RuiaPeeweeInsert(item.results)
+            yield item
 
 
-class MySQLUpdate(HackerNewsSpider):
+class MySQLUpdate(Update):
     async def parse(self, response):
         async for item in super().parse(response):
-            res = {}
-            res["title"] = item.results["title"]
-            res["url"] = "http://testing.com"
-            yield RuiaPeeweeUpdate(res, {"title": res["title"]})
+            yield item
 
 
-def base_setup(mysql):
+def basic_setup(mysql):
     async def init_after_start(spider_ins):
         spider_ins.mysql_config = mysql
         spider_ins.mysql_model = {
-            "table_name": "ruia_mysql_test",
+            "table_name": "ruia_mysql",
             "title": CharField(),
             "url": CharField(),
         }
@@ -40,22 +34,23 @@ def base_setup(mysql):
     return init_after_start
 
 
-@pytest.mark.dependency()
-async def test_mysql_insert(mysql, event_loop):
-    after_start = base_setup(mysql)
-    spider_ins = await MySQLInsert.async_start(loop=event_loop, after_start=after_start)
-    count = await spider_ins.mysql_manager.count(spider_ins.mysql_model.select())
-    one = await spider_ins.mysql_manager.get(spider_ins.mysql_model, id=randint(1, 11))
-    one_msg = f"One data, title: {one.title}, url: {one.url}"
-    logger.info(one_msg)
-    assert count >= 10, "Should insert 10 rows in MySQL."
+class TestMySQL:
+    @pytest.mark.dependency()
+    async def test_mysql_insert(self, mysql, event_loop):
+        after_start = basic_setup(mysql)
+        spider_ins = await MySQLInsert.async_start(
+            loop=event_loop, after_start=after_start
+        )
+        count = await spider_ins.mysql_manager.count(spider_ins.mysql_model.select())
+        assert count >= 10, "Should insert 10 rows in MySQL."
 
-
-@pytest.mark.dependency(depends=["test_mysql_insert"])
-async def test_mysql_update(mysql, event_loop):
-    after_start = base_setup(mysql)
-    spider_ins = await MySQLUpdate.async_start(loop=event_loop, after_start=after_start)
-    one = await spider_ins.mysql_manager.get(spider_ins.mysql_model, id=randint(1, 11))
-    one_msg = f"One data, title: {one.title}, url: {one.url}"
-    logger.info(one_msg)
-    assert one.url == "http://testing.com"
+    @pytest.mark.dependency(depends=["TestMySQL::test_mysql_insert"])
+    async def test_mysql_update(self, mysql, event_loop):
+        after_start = basic_setup(mysql)
+        spider_ins = await MySQLUpdate.async_start(
+            loop=event_loop, after_start=after_start
+        )
+        one = await spider_ins.mysql_manager.get(
+            spider_ins.mysql_model, id=randint(1, 11)
+        )
+        assert one.url == "http://testing.com"

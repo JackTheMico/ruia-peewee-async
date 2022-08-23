@@ -6,13 +6,22 @@ from typing import Dict, List, Optional, Tuple, Union
 from peewee import DoesNotExist, Model, Query
 from peewee_async import Manager, MySQLDatabase, PostgresqlDatabase
 from pymysql import OperationalError
-from ruia import Spider
+from ruia import Spider as RuiaSpider
 from ruia.exceptions import SpiderHookError
+
+
+class Spider(RuiaSpider):
+    mysql_model: Union[Model, Dict]
+    mysql_manager: Manager
+    postgres_model: Union[Model, Dict]
+    postgres_manager: Manager
+    mysql_db: MySQLDatabase
+    postgres_db: PostgresqlDatabase
 
 
 class TargetDB(Enum):
     MYSQL = 0
-    POSTGRESQL = 1
+    POSTGRES = 1
     BOTH = 2
 
 
@@ -32,7 +41,7 @@ class RuiaPeeweeInsert:
         try:
             if database == TargetDB.MYSQL:
                 await spider_ins.mysql_manager.create(spider_ins.mysql_model, **data)
-            elif database == TargetDB.POSTGRESQL:
+            elif database == TargetDB.POSTGRES:
                 await spider_ins.postgres_manager.create(
                     spider_ins.postgres_model, **data
                 )
@@ -69,42 +78,31 @@ class RuiaPeeweeUpdate:
         self.only = only
 
     @staticmethod
-    async def _update(spider_ins, data, database, query, create_when_not_exists, only):
-        if database == TargetDB.MYSQL:
+    async def _deal_update(
+        spider_ins, data, query, create_when_not_exists, only, databases
+    ):
+        for database in databases:
+            database = database.lower()
+            manager: Manager = getattr(spider_ins, f"{database}_manager")
+            model: Model = getattr(spider_ins, f"{database}_model")
             try:
-                model_ins = await spider_ins.mysql_manager.get(
-                    spider_ins.mysql_model, **query
-                )
+                model_ins = await manager.get(model, **query)
             except DoesNotExist:
                 if create_when_not_exists:
-                    await spider_ins.mysql_manager.create(
-                        spider_ins.mysql_model, **data
-                    )
+                    await manager.create(model, **data)
             else:
                 model_ins.__data__.update(data)
-                await spider_ins.mysql_manager.update(model_ins, only=only)
-        elif database == TargetDB.POSTGRESQL:
-            model_ins, created = await spider_ins.postgres_manager.get_or_create(
-                spider_ins.postgres_model, query, defaults=data
-            )
-            if not created:
-                model_ins.__data__.update(data)
-                await spider_ins.postgres_manager.update(model_ins, only=only)
-        elif database == TargetDB.BOTH:
-            model_ins, created = await spider_ins.mysql_manager.get_or_create(
-                spider_ins.mysql_model, query, defaults=data
-            )
-            if not created:
-                model_ins.__data__.update(data)
-                await spider_ins.mysql_manager.update(model_ins, only=only)
-            model_ins, created = await spider_ins.postgres_manager.get_or_create(
-                spider_ins.postgres_model, query, defaults=data
-            )
-            if not created:
-                model_ins.__data__.update(data)
-                await spider_ins.postgres_manager.update(model_ins, only=only)
+                await manager.update(model_ins, only=only)
+
+    @staticmethod
+    async def _update(spider_ins, data, query, database, create_when_not_exists, only):
+        if database == TargetDB.BOTH:
+            databases = [TargetDB.MYSQL.name, TargetDB.POSTGRES.name]
         else:
-            raise ValueError(f"TargetDB Enum value error: {database}")
+            databases = [database.name]
+        await RuiaPeeweeUpdate._deal_update(
+            spider_ins, data, query, create_when_not_exists, only, databases
+        )
 
     @staticmethod
     async def process(spider_ins, callback_result):
@@ -123,7 +121,7 @@ class RuiaPeeweeUpdate:
             )
         try:
             await RuiaPeeweeUpdate._update(
-                spider_ins, data, database, query, create_when_not_exists, only
+                spider_ins, data, query, database, create_when_not_exists, only
             )
         except OperationalError as ope:
             spider_ins.logger.error(
@@ -134,8 +132,8 @@ class RuiaPeeweeUpdate:
 
 
 def init_spider(*, spider_ins: Spider):
-    mysql_config = getattr(spider_ins, "mysql_config", None)
-    postgres_config = getattr(spider_ins, "postgres_config", None)
+    mysql_config = getattr(spider_ins, "mysql_config", {})
+    postgres_config = getattr(spider_ins, "postgres_config", {})
     if (
         (not mysql_config and not postgres_config)
         or (mysql_config and not isinstance(mysql_config, dict))
