@@ -89,3 +89,19 @@ if __name__ == "__main__":
     # DoubanSpider.start(after_start=after_start(mysql=mysql, postgres=postgres))
     # DoubanUpdateSpider.start(after_start=after_start(mysql=mysql))
 ```
+
+## Development
+Using `pyenv` to install the version of python that you need.
+For example
+```shell
+pyenv install 3.7.15
+```
+Then go to the root of the project and run:
+```shell
+poetry install
+```
+to install all dependencies.
+
+Using `poetry shell` to enter the virtual environment. Or open your favorite editor and select the virtual environment to start coding.
+
+Using `pytest` to run unit tests under `tests` folder.
