@@ -64,4 +64,9 @@ class Update(DoubanSpider):
             res = {}
             res["title"] = item.results["title"]
             res["url"] = "http://testing.com"
-            yield RuiaPeeweeUpdate(res, {"title": res["title"]}, self.target_db)
+            yield RuiaPeeweeUpdate(
+                res,
+                {"title": res["title"]},
+                self.target_db,
+                not_update_when_exists=False,
+            )
