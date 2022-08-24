@@ -8,6 +8,7 @@ import pytest
 logger = getLogger(__name__)
 
 
+@pytest.mark.no_cover
 def check_mysql(mysql_config) -> bool:
     try:
         connection = pymysql.connect(**mysql_config)
@@ -31,6 +32,7 @@ def mysql(docker_ip, docker_services):
     return mysql_config
 
 
+@pytest.mark.no_cover
 def check_postgres(postgres_config):
     try:
         conn = psycopg2.connect(**postgres_config)

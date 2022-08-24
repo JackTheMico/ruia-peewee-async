@@ -77,6 +77,7 @@ class RuiaPeeweeUpdate:
         query: Union[Query, dict],
         database: TargetDB = TargetDB.MYSQL,
         create_when_not_exists: bool = True,
+        not_update_when_exists: bool = True,
         only: Optional[Union[Tuple[str], List[str]]] = None,
     ) -> None:
         """
@@ -85,7 +86,8 @@ class RuiaPeeweeUpdate:
             data: A dict that's going to be updated in the database.
             query: A peewee query or a dict to search for the target data in database.
             database: The target database type.
-            create_when_not_exists: If True, will create a record when data not exists. Default is True.
+            create_when_not_exists: Default is True. If True, will create a record when data not exists.
+            not_update_when_exists: Default is True. If True and record exists, won't update data to records.
             only: A list or tuple of fields that should be updated.
 
         """
@@ -94,11 +96,18 @@ class RuiaPeeweeUpdate:
         self.query = query
         self.database = database
         self.create_when_not_exists = create_when_not_exists
+        self.not_update_when_exists = not_update_when_exists
         self.only = only
 
     @staticmethod
     async def _deal_update(
-        spider_ins, data, query, create_when_not_exists, only, databases
+        spider_ins,
+        data,
+        query,
+        create_when_not_exists,
+        not_update_when_exists,
+        only,
+        databases,
     ):
         for database in databases:
             database = database.lower()
@@ -110,17 +119,33 @@ class RuiaPeeweeUpdate:
                 if create_when_not_exists:
                     await manager.create(model, **data)
             else:
+                if not_update_when_exists:
+                    continue
                 model_ins.__data__.update(data)
                 await manager.update(model_ins, only=only)
 
     @staticmethod
-    async def _update(spider_ins, data, query, database, create_when_not_exists, only):
+    async def _update(
+        spider_ins,
+        data,
+        query,
+        database,
+        create_when_not_exists,
+        not_update_when_exists,
+        only,
+    ):
         if database == TargetDB.BOTH:
             databases = [TargetDB.MYSQL.name, TargetDB.POSTGRES.name]
         else:
             databases = [database.name]
         await RuiaPeeweeUpdate._deal_update(
-            spider_ins, data, query, create_when_not_exists, only, databases
+            spider_ins,
+            data,
+            query,
+            create_when_not_exists,
+            not_update_when_exists,
+            only,
+            databases,
         )
 
     @staticmethod
@@ -129,6 +154,7 @@ class RuiaPeeweeUpdate:
         database = callback_result.database
         query = callback_result.query
         create_when_not_exists = callback_result.create_when_not_exists
+        not_update_when_exists = callback_result.not_update_when_exists
         only = callback_result.only
         if not isinstance(query, (Query, dict)):
             raise ParameterError(
@@ -140,7 +166,13 @@ class RuiaPeeweeUpdate:
             )
         try:
             await RuiaPeeweeUpdate._update(
-                spider_ins, data, query, database, create_when_not_exists, only
+                spider_ins,
+                data,
+                query,
+                database,
+                create_when_not_exists,
+                not_update_when_exists,
+                only,
             )
         except OperationalError as ope:
             spider_ins.logger.error(
