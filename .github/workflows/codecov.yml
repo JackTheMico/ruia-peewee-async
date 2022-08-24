@@ -16,7 +16,7 @@ jobs:
         cache: 'poetry'
     - run: poetry install
     - name: Run tests and collect coverage
-      run: poetry run 'pytest --cov .'
+      run: poetry run pytest --cov .
     - name: Upload coverage reports to Codecov
       run: |
         # Replace `linux` below with the appropriate OS
