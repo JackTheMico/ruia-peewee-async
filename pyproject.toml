@@ -27,6 +27,7 @@ pytest-cov = "^3.0.0"
 [tool.poetry.extras]
 aiomysql = ["aiomysql"]
 aiopg = ["aiopg"]
+all = ["aiomysql", "aiopg"]
 
 [tool.pytest.ini_options]
 log_cli = true

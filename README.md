@@ -6,7 +6,15 @@ A [Ruia](https://github.com/howie6879/ruia) plugin that uses [peewee-async](http
 ## Installation
 
 ```shell
-pip install ruia-peewee-async
+pip install ruia-peewee-async[aiomysql]
+
+or
+
+pip install ruia-peewee-async[aiopg]
+
+or
+
+pip install ruia-peewee-async[all]
 ```
 
 ## Usage
