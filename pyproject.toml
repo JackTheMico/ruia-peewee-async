@@ -1,9 +1,18 @@
 [tool.poetry]
 name = "ruia-peewee-async"
-version = "1.0.2"
+version = "1.0.3"
 description = "A Ruia plugin that uses the peewee-async to store data to MySQL"
 authors = ["Jack Deng <dlwxxxdlw@gmail.com>"]
 license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/JackTheMico/ruia-peewee-async"
+repository = "https://github.com/JackTheMico/ruia-peewee-async"
+keywords = ["ruia", "plugin", "mysql", "postgresql"]
+classifiers = [
+    "Topic :: Software Development :: Documentation",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+include = ["LICENSE"]
 
 [tool.poetry.dependencies]
 python = "^3.7.2"
