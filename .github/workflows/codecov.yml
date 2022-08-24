@@ -1,7 +1,12 @@
 name: Codecov
 
-on: [push, pull_request]
-
+on:
+  push:
+    paths-ignore:
+      - '**/README.md'
+  pull_request:
+    paths-ignore:
+      - '**/README.md'
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,7 +20,7 @@ jobs:
         python-version: '3.7.9'
         cache: 'poetry'
     - run: |
-        poetry install && poetry install --all-extras
+        poetry install && poetry install -E aiomysql -E aiopg
     - name: Run tests and collect coverage
       run: poetry run pytest --cov .
     - name: Upload coverage reports to Codecov
