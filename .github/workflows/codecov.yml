@@ -15,7 +15,7 @@ jobs:
         python-version: '3.7.9'
         cache: 'poetry'
     - run: |
-        poetry install && poetry install -E aiomysql aiopg
+        poetry install && poetry install --all-extras
     - name: Run tests and collect coverage
       run: poetry run pytest --cov .
     - name: Upload coverage reports to Codecov
