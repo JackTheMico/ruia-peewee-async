@@ -439,7 +439,7 @@ name = "pymysql"
 version = "1.0.2"
 description = "Pure Python MySQL Driver"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6"
 
 [package.extras]
@@ -633,7 +633,7 @@ aiopg = ["aiopg"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7.2"
-content-hash = "cad0a610433ef01160623c7f6e1af409d63e8339abb841f1cbc7b9f53a7d0aec"
+content-hash = "a0186b50be88a8fb53bac2b223dcc9f3a85f9e9488dfa681200721d1fbbc71d6"
 
 [metadata.files]
 aiohttp = [
