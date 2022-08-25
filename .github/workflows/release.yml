@@ -2,20 +2,14 @@ name: Semantic Release
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
   pull_request:
     branches:
       - main
-    types:
-      - closed
 
 jobs:
   release:
     runs-on: ubuntu-latest
     if: github.event.pull_request.merged == true
-    concurrency: release
     steps:
       - name: Check out
         uses: actions/checkout@v3
