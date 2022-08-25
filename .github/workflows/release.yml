@@ -2,25 +2,28 @@ name: Semantic Release
 
 on:
   workflow_dispatch:
-  push:
+  workflow_run:
+    workflows:
+      - Codecov
     branches:
       - main
-  pull_request_review:
     types:
-      - submitted
+      - completed
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Check out
         uses: actions/checkout@v3
+      - name: Install poetry
+        run: pipx install poetry
+      - uses: actions/setup-python@v4
         with:
-          fetch-depth: 0
-
-      - name: Python Semantic Release
-        uses: relekang/python-semantic-release@master
+          python-version: 3.7.9
+          cache: poetry
+      - uses: bjoluc/semantic-release-config-poetry@v1
         with:
+          pypi_token: ${{ secrets.PYPI_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          repository_username: __token__
-          repository_password: ${{ secrets.PYPI_TOKEN }}
