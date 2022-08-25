@@ -16,6 +16,7 @@ include = ["LICENSE"]
 
 [tool.semantic_release]
 version_toml = "pyproject.toml:tool.poetry.version"
+version_source = "tag"
 
 [tool.poetry.dependencies]
 python = "^3.7.2"
