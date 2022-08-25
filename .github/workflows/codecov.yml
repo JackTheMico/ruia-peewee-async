@@ -12,6 +12,9 @@ on:
       - "*"
     paths-ignore:
       - '**/README.md'
+    types:
+      - opened
+      - reopened
 jobs:
   build:
     runs-on: ubuntu-latest
