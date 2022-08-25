@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ruia-peewee-async"
-version = "1.0.3"
+version = "1.0.4"
 description = "A Ruia plugin that uses the peewee-async to store data to MySQL"
 authors = ["Jack Deng <dlwxxxdlw@gmail.com>"]
 license = "MIT"
