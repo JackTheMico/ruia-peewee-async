@@ -1,6 +1,7 @@
 name: Codecov
 
 on:
+  workflow_dispatch:
   push:
     paths-ignore:
       - '**/README.md'
@@ -13,16 +14,16 @@ jobs:
     runs-on: ubuntu-latest
     name: Codecov Uploader
     steps:
-    - uses: actions/checkout@v3
-    - name: Install poetry
-      run: pipx install poetry
-    - uses: actions/setup-python@v4
-      with:
-        python-version: '3.7.9'
-        cache: 'poetry'
-    - run: |
-        poetry install && poetry install -E aiomysql -E aiopg
-    - name: Run tests and collect coverage
-      run: poetry run pytest --cov . --cov-report=xml
-    - name: Upload coverage reports to Codecov with GitHub Action
-      uses: codecov/codecov-action@v3
+      - uses: actions/checkout@v3
+      - name: Install poetry
+        run: pipx install poetry
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.7.9'
+          cache: 'poetry'
+      - run: |
+          poetry install && poetry install -E aiomysql -E aiopg
+      - name: Run tests and collect coverage
+        run: poetry run pytest --cov . --cov-report=xml
+      - name: Upload coverage reports to Codecov with GitHub Action
+        uses: codecov/codecov-action@v3
