@@ -9,7 +9,6 @@ from peewee import DoesNotExist, Model, Query
 from peewee_async import Manager, MySQLDatabase, PostgresqlDatabase
 from pymysql import OperationalError
 from ruia import Spider as RuiaSpider
-from ruia.exceptions import SpiderHookError
 
 
 class Spider(RuiaSpider):
