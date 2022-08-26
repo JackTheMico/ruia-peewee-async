@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
+import asyncio
 from random import randint
 
 import pytest
 from peewee import CharField
 
-from ruia_peewee_async import after_start
+from ruia_peewee_async import after_start, create_model
 
 from .common import Insert, Update
 
@@ -54,3 +55,23 @@ class TestMySQL:
             spider_ins.mysql_model, id=randint(1, 11)
         )
         assert one.url == "http://testing.com"
+
+    async def test_mysql_update_does_not_exist(self, mysql, event_loop):
+        mysql = basic_setup(mysql)
+        mysql["model"]["table_name"] = "ruia_mysql_notexist"
+        model, _ = create_model(create_table=True, mysql=mysql)
+        rows_before = model.select().count()
+        assert rows_before <= 3
+        spider_ins = await MySQLUpdate.async_start(
+            loop=event_loop,
+            after_start=after_start(mysql=mysql),
+        )
+        while not spider_ins.request_session.closed:
+            await asyncio.sleep(1)
+        rows_after = 0
+        while rows_after == 0:
+            rows_after = await spider_ins.mysql_manager.count(
+                spider_ins.mysql_model.select()
+            )
+            await asyncio.sleep(1)
+        assert rows_after > 0

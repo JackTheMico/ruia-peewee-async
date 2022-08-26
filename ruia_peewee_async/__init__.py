@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 __version__ = "1.0.4"
+from copy import deepcopy
 from enum import Enum
 from types import MethodType
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, Optional, Union, Sequence, Tuple
 
 from peewee import DoesNotExist, Model, Query
 from peewee_async import Manager, MySQLDatabase, PostgresqlDatabase
 from pymysql import OperationalError
 from ruia import Spider as RuiaSpider
-from ruia.exceptions import SpiderHookError
 
 
 class Spider(RuiaSpider):
@@ -44,7 +44,7 @@ class RuiaPeeweeInsert:
         self.database = database
 
     @staticmethod
-    async def process(spider_ins, callback_result):
+    async def process(spider_ins: RuiaSpider, callback_result):
         data = callback_result.data
         database = callback_result.database
         try:
@@ -60,13 +60,11 @@ class RuiaPeeweeInsert:
                     spider_ins.postgres_model, **data
                 )
             else:
-                raise ValueError(f"TargetDB Enum value error: {database}")
+                raise ParameterError(f"TargetDB value error: {database}")
         except OperationalError as ope:
             spider_ins.logger.error(
                 f"<RuiaPeeweeAsync: {database.name} insert error: {ope}>"
             )
-        except SpiderHookError as she:
-            spider_ins.logger.error(f"SpiderHookError: {she}>")
 
 
 class RuiaPeeweeUpdate:
@@ -79,7 +77,7 @@ class RuiaPeeweeUpdate:
         database: TargetDB = TargetDB.MYSQL,
         create_when_not_exists: bool = True,
         not_update_when_exists: bool = True,
-        only: Optional[Union[Tuple[str], List[str]]] = None,
+        only: Optional[Sequence[str]] = None,
     ) -> None:
         """
 
@@ -137,8 +135,10 @@ class RuiaPeeweeUpdate:
     ):
         if database == TargetDB.BOTH:
             databases = [TargetDB.MYSQL.name, TargetDB.POSTGRES.name]
-        else:
+        elif database in [TargetDB.MYSQL, TargetDB.POSTGRES]:
             databases = [database.name]
+        else:
+            raise ParameterError(f"TargetDB value error: {database}")
         await RuiaPeeweeUpdate._deal_update(
             spider_ins,
             data,
@@ -161,7 +161,7 @@ class RuiaPeeweeUpdate:
             raise ParameterError(
                 f"Parameter 'query': {query} has to be a peewee.Query or a dict."
             )
-        if only and not isinstance(only, (Tuple, List)):
+        if only and not isinstance(only, Sequence):
             raise ParameterError(
                 f"Parameter 'only': {only} has to be a Tuple or a List."
             )
@@ -179,57 +179,17 @@ class RuiaPeeweeUpdate:
             spider_ins.logger.error(
                 f"<RuiaPeeweeAsync: {database.name} insert error: {ope}>"
             )
-        except SpiderHookError as she:
-            spider_ins.logger.error(f"SpiderHookError: {she}>")
 
 
 def init_spider(*, spider_ins: Spider):
     mysql_config = getattr(spider_ins, "mysql_config", {})
     postgres_config = getattr(spider_ins, "postgres_config", {})
-    if (
-        (not mysql_config and not postgres_config)
-        or (mysql_config and not isinstance(mysql_config, dict))
-        or (postgres_config and not isinstance(postgres_config, dict))
-    ):
-        raise ValueError(
-            """
-            RuiaPeeweeAsync must have a param named mysql_config or postgres_config or both, eg:
-            mysql_config = {
-                'user': 'yourusername',
-                'password': 'yourpassword',
-                'host': '127.0.0.1',
-                'port': 3306,
-                'database': 'ruia_mysql'
-            }
-            postgres_config = {
-                'user': 'yourusername',
-                'password': 'yourpassword',
-                'host': '127.0.0.1',
-                'port': 5432,
-                'database': 'ruia_postgres'
-            }
-            """
-        )
-    if mysql_config:
-        spider_ins.mysql_db = MySQLDatabase(**mysql_config)
-        spider_ins.mysql_manager = Manager(spider_ins.mysql_db)
-        meta = type("Meta", (object,), {"database": spider_ins.mysql_db})
-        table_name = spider_ins.mysql_model.pop("table_name")
-        spider_ins.mysql_model["Meta"] = meta
-        spider_ins.mysql_model = type(table_name, (Model,), spider_ins.mysql_model)
-        with spider_ins.mysql_manager.allow_sync():
-            spider_ins.mysql_model.create_table(True)
-    if postgres_config:
-        spider_ins.postgres_db = PostgresqlDatabase(**postgres_config)
-        spider_ins.postgres_manager = Manager(spider_ins.postgres_db)
-        meta = type("Meta", (object,), {"database": spider_ins.postgres_db})
-        table_name = spider_ins.postgres_model.pop("table_name")
-        spider_ins.postgres_model["Meta"] = meta
-        spider_ins.postgres_model = type(
-            table_name, (Model,), spider_ins.postgres_model
-        )
-        with spider_ins.postgres_manager.allow_sync():
-            spider_ins.postgres_model.create_table(True)
+    create_model(
+        spider_ins=spider_ins,
+        create_table=True,
+        mysql=mysql_config,
+        postgres=postgres_config,
+    )
     spider_ins.callback_result_map = spider_ins.callback_result_map or {}
     spider_ins.process_insert_callback_result = MethodType(
         RuiaPeeweeInsert.process, spider_ins
@@ -266,23 +226,79 @@ def raise_no_model(config, model, name):
         )
 
 
-def after_start(**kwargs):
+def check_database_config(config: Dict):
+    if not config:
+        return
+    keys = {
+        "user": str,
+        "password": str,
+        "host": str,
+        "port": int,
+        "database": str,
+        "model": Dict,
+    }
+    conf_keys = list(config.keys())
+    for key, vtype in keys.items():
+        if key not in conf_keys:
+            raise ParameterError(f"{key} must in config dict.")
+        value = config[key]
+        if not isinstance(value, vtype):
+            raise ParameterError(f"{key}'s type must be {vtype}")
+        if key == "model":
+            if "table_name" not in value.keys():
+                raise ParameterError(f"{key} must in model dict")
+            if not isinstance(value["table_name"], str):
+                raise ParameterError(f"{key}'s table_name's value must be a str")
+
+
+def check_config(kwargs) -> Sequence[Dict]:
+    no_config_msg = """
+            RuiaPeeweeAsync must have a param named mysql_config or postgres_config or both, eg:
+            mysql_config = {
+                'user': 'yourusername',
+                'password': 'yourpassword',
+                'host': '127.0.0.1',
+                'port': 3306,
+                'database': 'ruia_mysql',
+                'model': {{
+                    'table_name': 'ruia_mysql_table',
+                    "title": CharField(),
+                    'url': CharField(),
+                }},
+            }
+            postgres_config = {
+                'user': 'yourusername',
+                'password': 'yourpassword',
+                'host': '127.0.0.1',
+                'port': 5432,
+                'database': 'ruia_postgres',
+                'model': {{
+                    'table_name': 'ruia_postgres_table',
+                    "title": CharField(),
+                    'url': CharField(),
+                }},
+            }
+            """
     if not kwargs:
-        raise ParameterError(
-            "There must be a 'mysql' or 'postgres' parameter or both of them."
-        )
+        raise ParameterError(no_config_msg)
     mysql = kwargs.get("mysql", {})
     postgres = kwargs.get("postgres", {})
     if not mysql and not postgres:
-        raise ParameterError(
-            "MySQL and PostgreSQL configs cannout be empty at the same time."
-        )
-    mysql_model = mysql.pop("model", None)
-    postgres_model = postgres.pop("model", None)
+        raise ParameterError(no_config_msg)
+    check_database_config(mysql)
+    check_database_config(postgres)
+    mysql_model = mysql.get("model", None)
+    postgres_model = postgres.get("model", None)
     raise_no_model(mysql, mysql_model, "MySQL")
     raise_no_model(postgres, postgres_model, "PostgreSQL")
+    return mysql, mysql_model, postgres, postgres_model
+
+
+def after_start(**kwargs):
+    mysql, mysql_model, postgres, postgres_model = check_config(kwargs)
 
     async def init_after_start(spider_ins):
+
         if mysql and mysql_model:
             spider_ins.mysql_config = mysql
             spider_ins.mysql_model = mysql_model
@@ -292,3 +308,44 @@ def after_start(**kwargs):
         init_spider(spider_ins=spider_ins)
 
     return init_after_start
+
+
+def create_model(spider_ins=None, create_table=False, **kwargs) -> Tuple:
+    kwcopy = deepcopy(kwargs)
+    mysql, mysql_model, postgres, postgres_model = check_config(kwcopy)
+    mysql_manager, postgres_manager = None, None
+    if mysql:
+        mysql.pop("model")
+        mysql_db = MySQLDatabase(**mysql)
+        mysql_manager = Manager(mysql_db)
+        meta = type("Meta", (object,), {"database": mysql_db})
+        table_name = mysql_model.pop("table_name")
+        mysql_model["Meta"] = meta
+        mysql_model = type(table_name, (Model,), mysql_model)
+        if spider_ins:
+            spider_ins.mysql_db = mysql_db
+            spider_ins.mysql_model = mysql_model
+            spider_ins.mysql_manager = mysql_manager
+        if create_table:
+            with mysql_manager.allow_sync():
+                mysql_model.create_table(True)
+    if postgres:
+        postgres.pop("model")
+        postgres_db = PostgresqlDatabase(**postgres)
+        postgres_manager = Manager(postgres_db)
+        meta = type("Meta", (object,), {"database": postgres_db})
+        table_name = postgres_model.pop("table_name")
+        postgres_model["Meta"] = meta
+        postgres_model = type(table_name, (Model,), postgres_model)
+        if spider_ins:
+            spider_ins.postgres_db = postgres_db
+            spider_ins.postgres_model = postgres_model
+            spider_ins.postgres_manager = postgres_manager
+        if create_table:
+            with postgres_manager.allow_sync():
+                postgres_model.create_table(True)
+    if mysql and not postgres:
+        return mysql_model, mysql_manager
+    if postgres and not mysql:
+        return postgres_model, postgres_manager
+    return mysql_model, mysql_manager, postgres_model, postgres_manager
