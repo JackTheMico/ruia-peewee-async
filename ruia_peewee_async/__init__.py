@@ -135,7 +135,7 @@ class RuiaPeeweeUpdate:
     ):
         if database == TargetDB.BOTH:
             databases = [TargetDB.MYSQL.name, TargetDB.POSTGRES.name]
-        elif database in [TargetDB.MYSQL.name, TargetDB.POSTGRES.name]:
+        elif database in [TargetDB.MYSQL, TargetDB.POSTGRES]:
             databases = [database.name]
         else:
             raise ParameterError(f"TargetDB value error: {database}")

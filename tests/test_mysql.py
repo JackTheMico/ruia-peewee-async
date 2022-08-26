@@ -61,14 +61,17 @@ class TestMySQL:
         mysql["model"]["table_name"] = "ruia_mysql_notexist"
         model, _ = create_model(create_table=True, mysql=mysql)
         rows_before = model.select().count()
+        assert rows_before <= 3
         spider_ins = await MySQLUpdate.async_start(
             loop=event_loop,
             after_start=after_start(mysql=mysql),
         )
         while not spider_ins.request_session.closed:
-            await asyncio.sleep(5)
-        rows_after = await spider_ins.mysql_manager.count(
-            spider_ins.mysql_model.select()
-        )
-        assert rows_before <= 3
+            await asyncio.sleep(1)
+        rows_after = 0
+        while rows_after == 0:
+            rows_after = await spider_ins.mysql_manager.count(
+                spider_ins.mysql_model.select()
+            )
+            await asyncio.sleep(1)
         assert rows_after > 0

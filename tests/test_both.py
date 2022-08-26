@@ -87,20 +87,26 @@ class TestBoth:
         pmodel, _ = create_model(create_table=True, postgres=postgresql)
         mrows_before = mmodel.select().count()
         prows_before = pmodel.select().count()
+        assert mrows_before <= 3
+        assert prows_before <= 3
         spider_ins = await BothUpdate.async_start(
             loop=event_loop,
             after_start=after_start(mysql=mysql, postgres=postgresql),
             target_db=TargetDB.BOTH,
         )
         while not spider_ins.request_session.closed:
-            await asyncio.sleep(5)
-        mrows_after = await spider_ins.mysql_manager.count(
-            spider_ins.mysql_model.select()
-        )
-        prows_after = await spider_ins.postgres_manager.count(
-            spider_ins.postgres_model.select()
-        )
-        assert mrows_before <= 3
-        assert prows_before <= 3
+            await asyncio.sleep(1)
+        mrows_after = 0
+        while mrows_after == 0:
+            mrows_after = await spider_ins.mysql_manager.count(
+                spider_ins.mysql_model.select()
+            )
+            await asyncio.sleep(1)
         assert mrows_after > 0
+        prows_after = 0
+        while prows_after == 0:
+            prows_after = await spider_ins.postgres_manager.count(
+                spider_ins.postgres_model.select()
+            )
+            await asyncio.sleep(1)
         assert prows_after > 0
