@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+__version__ = "1.0.4"
 from enum import Enum
 from types import MethodType
 from typing import Dict, List, Optional, Tuple, Union

@@ -18,7 +18,7 @@ include = ["LICENSE"]
 version_toml = "pyproject.toml:tool.poetry.version"
 version_source = "tag"
 branch = "main"
-build_command = "poetry build"
+build_command = "pip install poetry && poetry build"
 upload_to_release = true
 
 [tool.poetry.dependencies]
