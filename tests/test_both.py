@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
+import asyncio
 from random import randint
 
 import pytest
 from peewee import CharField
 
-from ruia_peewee_async import TargetDB, after_start
+from ruia_peewee_async import TargetDB, after_start, create_model
 
 from .common import Insert, Update
 
@@ -77,3 +78,29 @@ class TestBoth:
         )
         assert mysql_one.url == "http://testing.com"
         assert postgres_one.url == "http://testing.com"
+
+    async def test_both_update_does_not_exist(self, mysql, postgresql, event_loop):
+        mysql, postgresql = basic_setup(mysql, postgresql)
+        mysql["model"]["table_name"] = "ruia_mysql_both_notexist"
+        postgresql["model"]["table_name"] = "ruia_postgres_both_notexist"
+        mmodel, _ = create_model(create_table=True, mysql=mysql)
+        pmodel, _ = create_model(create_table=True, postgres=postgresql)
+        mrows_before = mmodel.select().count()
+        prows_before = pmodel.select().count()
+        spider_ins = await BothUpdate.async_start(
+            loop=event_loop,
+            after_start=after_start(mysql=mysql, postgres=postgresql),
+            target_db=TargetDB.BOTH,
+        )
+        while not spider_ins.request_session.closed:
+            await asyncio.sleep(5)
+        mrows_after = await spider_ins.mysql_manager.count(
+            spider_ins.mysql_model.select()
+        )
+        prows_after = await spider_ins.postgres_manager.count(
+            spider_ins.postgres_model.select()
+        )
+        assert mrows_before <= 3
+        assert prows_before <= 3
+        assert mrows_after > 0
+        assert prows_after > 0
