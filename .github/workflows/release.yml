@@ -17,12 +17,15 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v3
-
+      - name: Install poetry
+        run: pipx install poetry
       - uses: actions/setup-python@v4
         name: Setup Python
         with:
           python-version: 3.7.9
           cache: poetry
+      - run: |
+          poetry install && poetry install -E aiomysql -E aiopg
       - name: Python Semantic Release
         uses: relekang/python-semantic-release@master
         with:
