@@ -13,7 +13,7 @@ def check_mysql(mysql_config) -> bool:
     try:
         connection = pymysql.connect(**mysql_config)
         return connection.open
-    except pymysql.OperationalError:
+    except pymysql.OperationalError:  # pragma: no cover
         logger.info("Waitting for MySQL starting completed.")
         return False
 
@@ -37,7 +37,7 @@ def check_postgres(postgres_config):
     try:
         conn = psycopg2.connect(**postgres_config)
         return conn.status == psycopg2.extensions.STATUS_READY
-    except psycopg2.OperationalError:
+    except psycopg2.OperationalError:  # pragma: no cover
         logger.info("Waitting for PostgreSQL starting completed.")
         return False
 

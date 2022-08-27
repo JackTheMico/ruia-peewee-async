@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 __version__ = "1.0.4"
+from ssl import SSLContext
 from copy import deepcopy
 from enum import Enum
+from functools import wraps
 from types import MethodType
-from typing import Dict, Optional, Union, Sequence, Tuple
+from typing import Dict, Optional, Sequence, Tuple, Union
 
 from peewee import DoesNotExist, Model, Query
 from peewee_async import Manager, MySQLDatabase, PostgresqlDatabase
@@ -30,6 +32,29 @@ class ParameterError(Exception):
     pass
 
 
+def logging(func):
+    @wraps(func)
+    async def decorator(spider_ins: Spider, callback_result):
+        data = callback_result.data
+        database = callback_result.database
+        msg_pre = f"<RuiaPeeweeAsync: Success insert data: {data} into "
+        try:
+            result = await func(spider_ins, callback_result)
+        except OperationalError as ope:
+            spider_ins.logger.error(
+                f"<RuiaPeeweeAsync: {database.name} insert error: {ope}>"
+            )
+        except ParameterError as pae:
+            spider_ins.logger.error(pae)
+            raise pae
+        else:
+            msg = "".join([msg_pre, database.name, ">"])
+            spider_ins.logger.info(msg)
+            return result
+
+    return decorator
+
+
 class RuiaPeeweeInsert:
     def __init__(self, data: Dict, database: TargetDB = TargetDB.MYSQL) -> None:
         """
@@ -44,27 +69,28 @@ class RuiaPeeweeInsert:
         self.database = database
 
     @staticmethod
-    async def process(spider_ins: RuiaSpider, callback_result):
+    @logging
+    async def process(spider_ins: Spider, callback_result):
         data = callback_result.data
         database = callback_result.database
-        try:
-            if database == TargetDB.MYSQL:
-                await spider_ins.mysql_manager.create(spider_ins.mysql_model, **data)
-            elif database == TargetDB.POSTGRES:
-                await spider_ins.postgres_manager.create(
-                    spider_ins.postgres_model, **data
-                )
-            elif database == TargetDB.BOTH:
-                await spider_ins.mysql_manager.create(spider_ins.mysql_model, **data)
-                await spider_ins.postgres_manager.create(
-                    spider_ins.postgres_model, **data
-                )
-            else:
-                raise ParameterError(f"TargetDB value error: {database}")
-        except OperationalError as ope:
-            spider_ins.logger.error(
-                f"<RuiaPeeweeAsync: {database.name} insert error: {ope}>"
-            )
+        # msg_pre = f"Success insert data: {data} into "
+        # try:
+        if database == TargetDB.MYSQL:
+            await spider_ins.mysql_manager.create(spider_ins.mysql_model, **data)
+        elif database == TargetDB.POSTGRES:
+            await spider_ins.postgres_manager.create(spider_ins.postgres_model, **data)
+        elif database == TargetDB.BOTH:
+            await spider_ins.mysql_manager.create(spider_ins.mysql_model, **data)
+            await spider_ins.postgres_manager.create(spider_ins.postgres_model, **data)
+        else:
+            raise ParameterError(f"<RuiaPeeweeAsync: TargetDB value error: {database}>")
+        # except OperationalError as ope:
+        #     spider_ins.logger.error(
+        #         f"<RuiaPeeweeAsync: {database.name} insert error: {ope}>"
+        #     )
+        # else:
+        #     msg = "".join([msg_pre, database.name])
+        #     spider_ins.logger.info(msg)
 
 
 class RuiaPeeweeUpdate:
@@ -117,11 +143,25 @@ class RuiaPeeweeUpdate:
             except DoesNotExist:
                 if create_when_not_exists:
                     await manager.create(model, **data)
+                    spider_ins.logger.info(
+                        f"<RuiaPeeweeAsync: data: {data} not exists in {database}, but success created>"
+                    )
+                else:
+                    spider_ins.logger.error(
+                        f"<RuiaPeeweeAsync: data: {data} not exists in {database}, \
+                                won't create it because create_when_not_exists is False>"
+                    )
             else:
                 if not_update_when_exists:
+                    spider_ins.logger.info(
+                        f"<RuiaPeeweeAsync: {data} won't updated in {database}"
+                    )
                     continue
                 model_ins.__data__.update(data)
                 await manager.update(model_ins, only=only)
+                spider_ins.logger.info(
+                    f"<RuiaPeeweeAsync: {data} was updated in {database}"
+                )
 
     @staticmethod
     async def _update(
@@ -150,6 +190,7 @@ class RuiaPeeweeUpdate:
         )
 
     @staticmethod
+    @logging
     async def process(spider_ins, callback_result):
         data = callback_result.data
         database = callback_result.database
@@ -159,26 +200,26 @@ class RuiaPeeweeUpdate:
         only = callback_result.only
         if not isinstance(query, (Query, dict)):
             raise ParameterError(
-                f"Parameter 'query': {query} has to be a peewee.Query or a dict."
+                f"<RuiaPeeweeAsync: Parameter 'query': {query} has to be a peewee.Query or a dict>"
             )
         if only and not isinstance(only, Sequence):
             raise ParameterError(
-                f"Parameter 'only': {only} has to be a Tuple or a List."
+                f"<RuiaPeeweeAsync: Parameter 'only': {only} has to be a Tuple or a List>"
             )
-        try:
-            await RuiaPeeweeUpdate._update(
-                spider_ins,
-                data,
-                query,
-                database,
-                create_when_not_exists,
-                not_update_when_exists,
-                only,
-            )
-        except OperationalError as ope:
-            spider_ins.logger.error(
-                f"<RuiaPeeweeAsync: {database.name} insert error: {ope}>"
-            )
+        # try:
+        await RuiaPeeweeUpdate._update(
+            spider_ins,
+            data,
+            query,
+            database,
+            create_when_not_exists,
+            not_update_when_exists,
+            only,
+        )
+        # except OperationalError as ope:
+        #     spider_ins.logger.error(
+        #         f"<RuiaPeeweeAsync: {database.name} insert error: {ope}>"
+        #     )
 
 
 def init_spider(*, spider_ins: Spider):
@@ -236,12 +277,15 @@ def check_database_config(config: Dict):
         "port": int,
         "database": str,
         "model": Dict,
+        "ssl": SSLContext,
     }
-    conf_keys = list(config.keys())
-    for key, vtype in keys.items():
-        if key not in conf_keys:
+    optionals = ["port", "ssl"]
+    for key, value in config.items():
+        if key not in keys and key not in optionals:
             raise ParameterError(f"{key} must in config dict.")
-        value = config[key]
+        if key not in keys and key in optionals:
+            continue
+        vtype = keys[key]
         if not isinstance(value, vtype):
             raise ParameterError(f"{key}'s type must be {vtype}")
         if key == "model":
