@@ -18,7 +18,7 @@ def check_mysql(mysql_config) -> bool:
         return False
 
 
-@pytest.fixture(scope="class")
+@pytest.fixture(scope="session")
 def mysql(docker_ip, docker_services):
     port = docker_services.port_for("mysql", 3306)
     mysql_config = {
@@ -42,7 +42,7 @@ def check_postgres(postgres_config):
         return False
 
 
-@pytest.fixture(scope="class")
+@pytest.fixture(scope="session")
 def postgresql(docker_ip, docker_services):
     port = docker_services.port_for("postgres", 5432)
     postgres_config = {

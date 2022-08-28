@@ -5,11 +5,7 @@ from random import randint
 import pytest
 from peewee import CharField
 
-from ruia_peewee_async import (
-    TargetDB,
-    after_start,
-    create_model,
-)
+from ruia_peewee_async import TargetDB, after_start, create_model
 
 from .common import Insert, Update
 
@@ -54,24 +50,64 @@ class TestPostgreSQL:
         assert count >= 10, "Should insert 10 rows in PostgreSQL."
 
     @pytest.mark.dependency(depends=["TestPostgreSQL::test_postgres_insert"])
+    async def test_postgres_not_update_when_exists(self, postgresql, event_loop):
+        postgresql = basic_setup(postgresql)
+        spider_ins = await PostgresqlUpdate.async_start(
+            loop=event_loop,
+            after_start=after_start(postgres=postgresql),
+            not_update_when_exists=True,
+            target_db=TargetDB.POSTGRES,
+        )
+        one = await spider_ins.postgres_manager.get(
+            spider_ins.postgres_model, id=randint(1, 11)
+        )
+        assert one.url != "http://testing.com"
+
+    @pytest.mark.dependency(
+        depends=["TestPostgreSQL::test_postgres_not_update_when_exists"]
+    )
     async def test_postgres_update(self, postgresql, event_loop):
         postgresql = basic_setup(postgresql)
         spider_ins = await PostgresqlUpdate.async_start(
             loop=event_loop,
             after_start=after_start(postgres=postgresql),
             target_db=TargetDB.POSTGRES,
+            not_update_when_exists=False,
         )
         one = await spider_ins.postgres_manager.get(
             spider_ins.postgres_model, id=randint(1, 11)
         )
         assert one.url == "http://testing.com"
+        spider_ins.postgres_model.truncate_table()
 
-    async def test_postgres_update_does_not_exist(self, postgresql, event_loop):
+    @pytest.mark.dependency(depends=["TestPostgreSQL::test_postgres_update"])
+    async def test_postgres_dont_create_when_not_exists(self, postgresql, event_loop):
         postgresql = basic_setup(postgresql)
-        postgresql["model"]["table_name"] = "ruia_postgres_notexist"
         model, _ = create_model(create_table=True, postgres=postgresql)
         rows_before = model.select().count()
-        assert rows_before <= 3
+        assert rows_before == 0
+        spider_ins = await PostgresqlUpdate.async_start(
+            loop=event_loop,
+            after_start=after_start(postgres=postgresql),
+            create_when_not_exists=False,
+            target_db=TargetDB.POSTGRES,
+        )
+        while not spider_ins.request_session.closed:
+            await asyncio.sleep(1)
+        rows_after = await spider_ins.postgres_manager.count(
+            spider_ins.postgres_model.select()
+        )
+        assert rows_after == 0
+
+    @pytest.mark.dependency(
+        depends=["TestPostgreSQL::test_postgres_dont_create_when_not_exists"]
+    )
+    async def test_postgres_create_when_not_exists(self, postgresql, event_loop):
+        postgresql = basic_setup(postgresql)
+        # postgresql["model"]["table_name"] = "ruia_postgres_notexist"
+        model, _ = create_model(create_table=True, postgres=postgresql)
+        rows_before = model.select().count()
+        assert rows_before == 0
         spider_ins = await PostgresqlUpdate.async_start(
             loop=event_loop,
             after_start=after_start(postgres=postgresql),
@@ -85,4 +121,4 @@ class TestPostgreSQL:
                 spider_ins.postgres_model.select()
             )
             await asyncio.sleep(1)
-        assert rows_after > 0
+        assert rows_after == 10

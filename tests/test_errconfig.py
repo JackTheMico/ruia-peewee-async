@@ -20,7 +20,7 @@ def docker_cleansup():
 
 
 class TestErrConfig:
-    async def test_targetdb_error(self, event_loop):
+    async def test_process_errconifg(self, event_loop):
         class Temp:
             def __init__(
                 self,
@@ -38,14 +38,38 @@ class TestErrConfig:
                 self.not_update_when_exists = not_update_when_exists
                 self.only = only
 
-        with pytest.raises(ParameterError):
+        with pytest.raises(ParameterError) as te1:
             insert = Insert(loop=event_loop)
             await RuiaPeeweeInsert.process(insert, Temp("testdata", "errorstr"))
-        with pytest.raises(ParameterError):
+        assert te1.value.args[0] == "<RuiaPeeweeAsync: TargetDB value error: errorstr>"
+        with pytest.raises(ParameterError) as qe1:
+            update = Update(loop=event_loop)
+            await RuiaPeeweeUpdate.process(update, Temp("testdata", "errorbase"))
+        assert (
+            qe1.value.args[0]
+            == "<RuiaPeeweeAsync: Parameter 'query': None has to be a peewee.Query or a dict>"
+        )
+        with pytest.raises(ParameterError) as qe2:
             update = Update(loop=event_loop)
             await RuiaPeeweeUpdate.process(
-                update, Temp("testdata", "errorstr", query="")
+                update, Temp("testdata", "errorbase", query="asdf")
             )
+        assert (
+            qe2.value.args[0]
+            == "<RuiaPeeweeAsync: Parameter 'query': asdf has to be a peewee.Query or a dict>"
+        )
+        with pytest.raises(ParameterError) as te2:
+            update = Update(loop=event_loop)
+            await RuiaPeeweeUpdate.process(
+                update, Temp("testdata", "errorbase", query={"123": "asfd"}, only="")
+            )
+        assert te2.value.args[0] == "<RuiaPeeweeAsync: TargetDB value error: errorbase>"
+        with pytest.raises(ParameterError) as te3:
+            update = Update(loop=event_loop)
+            await RuiaPeeweeUpdate.process(
+                update, Temp("testdata", "errorbase", query={"123": "asdf"})
+            )
+        assert te3.value.args[0] == "<RuiaPeeweeAsync: TargetDB value error: errorbase>"
 
     async def test_noconfig(
         self, docker_setup, docker_cleanup, event_loop

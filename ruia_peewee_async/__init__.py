@@ -40,7 +40,7 @@ def logging(func):
         msg_pre = f"<RuiaPeeweeAsync: Success insert data: {data} into "
         try:
             result = await func(spider_ins, callback_result)
-        except OperationalError as ope:
+        except OperationalError as ope:  # pragma: no cover
             spider_ins.logger.error(
                 f"<RuiaPeeweeAsync: {database.name} insert error: {ope}>"
             )
@@ -84,13 +84,6 @@ class RuiaPeeweeInsert:
             await spider_ins.postgres_manager.create(spider_ins.postgres_model, **data)
         else:
             raise ParameterError(f"<RuiaPeeweeAsync: TargetDB value error: {database}>")
-        # except OperationalError as ope:
-        #     spider_ins.logger.error(
-        #         f"<RuiaPeeweeAsync: {database.name} insert error: {ope}>"
-        #     )
-        # else:
-        #     msg = "".join([msg_pre, database.name])
-        #     spider_ins.logger.info(msg)
 
 
 class RuiaPeeweeUpdate:
@@ -147,20 +140,20 @@ class RuiaPeeweeUpdate:
                         f"<RuiaPeeweeAsync: data: {data} not exists in {database}, but success created>"
                     )
                 else:
-                    spider_ins.logger.error(
+                    spider_ins.logger.warning(
                         f"<RuiaPeeweeAsync: data: {data} not exists in {database}, \
                                 won't create it because create_when_not_exists is False>"
                     )
             else:
                 if not_update_when_exists:
                     spider_ins.logger.info(
-                        f"<RuiaPeeweeAsync: {data} won't updated in {database}"
+                        f"<RuiaPeeweeAsync: {data} won't updated in {database}>"
                     )
                     continue
                 model_ins.__data__.update(data)
                 await manager.update(model_ins, only=only)
                 spider_ins.logger.info(
-                    f"<RuiaPeeweeAsync: {data} was updated in {database}"
+                    f"<RuiaPeeweeAsync: {data} was updated in {database}>"
                 )
 
     @staticmethod
@@ -178,7 +171,7 @@ class RuiaPeeweeUpdate:
         elif database in [TargetDB.MYSQL, TargetDB.POSTGRES]:
             databases = [database.name]
         else:
-            raise ParameterError(f"TargetDB value error: {database}")
+            raise ParameterError(f"<RuiaPeeweeAsync: TargetDB value error: {database}>")
         await RuiaPeeweeUpdate._deal_update(
             spider_ins,
             data,
@@ -198,7 +191,8 @@ class RuiaPeeweeUpdate:
         create_when_not_exists = callback_result.create_when_not_exists
         not_update_when_exists = callback_result.not_update_when_exists
         only = callback_result.only
-        if not isinstance(query, (Query, dict)):
+        print(type(query))
+        if not query or not isinstance(query, (Query, Dict)):
             raise ParameterError(
                 f"<RuiaPeeweeAsync: Parameter 'query': {query} has to be a peewee.Query or a dict>"
             )
@@ -216,10 +210,6 @@ class RuiaPeeweeUpdate:
             not_update_when_exists,
             only,
         )
-        # except OperationalError as ope:
-        #     spider_ins.logger.error(
-        #         f"<RuiaPeeweeAsync: {database.name} insert error: {ope}>"
-        #     )
 
 
 def init_spider(*, spider_ins: Spider):
@@ -249,7 +239,7 @@ def init_spider(*, spider_ins: Spider):
 def raise_no_model(config, model, name):
     if config and not model:
         raise ParameterError(
-            f"""{name} must have 'model' in config and 'model' cannot be empty.
+            f"""<RuiaPeeweeAsync: {name} must have 'model' in config and 'model' cannot be empty.
             For example:
                 {{
                     'host': '127.0.0.1',
@@ -262,7 +252,7 @@ def raise_no_model(config, model, name):
                         "title": CharField(),
                         'url': CharField(),
                     }},
-                }}
+                }}>
                 """
         )
 
@@ -282,17 +272,19 @@ def check_database_config(config: Dict):
     optionals = ["port", "ssl"]
     for key, value in config.items():
         if key not in keys and key not in optionals:
-            raise ParameterError(f"{key} must in config dict.")
+            raise ParameterError(f"<RuiaPeeweeAsync: {key} must in config dict>")
         if key not in keys and key in optionals:
             continue
         vtype = keys[key]
         if not isinstance(value, vtype):
-            raise ParameterError(f"{key}'s type must be {vtype}")
+            raise ParameterError(f"<RuiaPeeweeAsync: {key}'s type must be {vtype}>")
         if key == "model":
             if "table_name" not in value.keys():
-                raise ParameterError(f"{key} must in model dict")
+                raise ParameterError(f"<RuiaPeeweeAsync: {key} must in model dict>")
             if not isinstance(value["table_name"], str):
-                raise ParameterError(f"{key}'s table_name's value must be a str")
+                raise ParameterError(
+                    f"<RuiaPeeweeAsync: {key}'s table_name's value must be a str>"
+                )
 
 
 def check_config(kwargs) -> Sequence[Dict]:

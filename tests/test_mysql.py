@@ -46,22 +46,59 @@ class TestMySQL:
         assert count >= 10, "Should insert 10 rows in MySQL."
 
     @pytest.mark.dependency(depends=["TestMySQL::test_mysql_insert"])
+    async def test_mysql_not_update_when_exists(self, mysql, event_loop):
+        mysql = basic_setup(mysql)
+        spider_ins = await MySQLUpdate.async_start(
+            loop=event_loop,
+            after_start=after_start(mysql=mysql),
+            not_update_when_exists=True,
+        )
+        one = await spider_ins.mysql_manager.get(
+            spider_ins.mysql_model, id=randint(1, 11)
+        )
+        assert one.url != "http://testing.com"
+
+    @pytest.mark.dependency(depends=["TestMySQL::test_mysql_not_update_when_exists"])
     async def test_mysql_update(self, mysql, event_loop):
         mysql = basic_setup(mysql)
         spider_ins = await MySQLUpdate.async_start(
-            loop=event_loop, after_start=after_start(mysql=mysql)
+            loop=event_loop,
+            after_start=after_start(mysql=mysql),
+            not_update_when_exists=False,
         )
         one = await spider_ins.mysql_manager.get(
             spider_ins.mysql_model, id=randint(1, 11)
         )
         assert one.url == "http://testing.com"
+        spider_ins.mysql_model.truncate_table()
 
-    async def test_mysql_update_does_not_exist(self, mysql, event_loop):
+    @pytest.mark.dependency(depends=["TestMySQL::test_mysql_update"])
+    async def test_mysql_dont_create_when_not_exists(self, mysql, event_loop):
         mysql = basic_setup(mysql)
-        mysql["model"]["table_name"] = "ruia_mysql_notexist"
         model, _ = create_model(create_table=True, mysql=mysql)
         rows_before = model.select().count()
-        assert rows_before <= 3
+        assert rows_before == 0
+        spider_ins = await MySQLUpdate.async_start(
+            loop=event_loop,
+            after_start=after_start(mysql=mysql),
+            create_when_not_exists=False,
+        )
+        while not spider_ins.request_session.closed:
+            await asyncio.sleep(1)
+        rows_after = await spider_ins.mysql_manager.count(
+            spider_ins.mysql_model.select()
+        )
+        assert rows_after == 0
+
+    @pytest.mark.dependency(
+        depends=["TestMySQL::test_mysql_dont_create_when_not_exists"]
+    )
+    async def test_mysql_create_when_not_exists(self, mysql, event_loop):
+        mysql = basic_setup(mysql)
+        # mysql["model"]["table_name"] = "ruia_mysql_notexist"
+        model, _ = create_model(create_table=True, mysql=mysql)
+        rows_before = model.select().count()
+        assert rows_before == 0
         spider_ins = await MySQLUpdate.async_start(
             loop=event_loop,
             after_start=after_start(mysql=mysql),
@@ -74,4 +111,4 @@ class TestMySQL:
                 spider_ins.mysql_model.select()
             )
             await asyncio.sleep(1)
-        assert rows_after > 0
+        assert rows_after == 10
