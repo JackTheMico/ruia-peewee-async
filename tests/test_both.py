@@ -72,10 +72,10 @@ class TestBoth:
             target_db=TargetDB.BOTH,
         )
         pone = await spider_ins.postgres_manager.get(
-            spider_ins.postgres_model, id=randint(1, 11)
+            spider_ins.postgres_model, id=randint(1, 10)
         )
         mone = await spider_ins.mysql_manager.get(
-            spider_ins.mysql_model, id=randint(1, 11)
+            spider_ins.mysql_model, id=randint(1, 10)
         )
         assert pone.url != "http://testing.com"
         assert mone.url != "http://testing.com"
@@ -89,14 +89,16 @@ class TestBoth:
             target_db=TargetDB.BOTH,
             not_update_when_exists=False,
         )
-        mysql_one = await spider_ins.mysql_manager.get(
-            spider_ins.mysql_model, id=randint(1, 11)
-        )
-        postgres_one = await spider_ins.postgres_manager.get(
-            spider_ins.postgres_model, id=randint(1, 11)
-        )
-        assert mysql_one.url == "http://testing.com"
-        assert postgres_one.url == "http://testing.com"
+        for mid in range(1, 11):
+            mysql_one = await spider_ins.mysql_manager.get(
+                spider_ins.mysql_model, id=mid
+            )
+            assert mysql_one.url == "http://testing.com"
+        for pid in range(1, 11):
+            postgres_one = await spider_ins.postgres_manager.get(
+                spider_ins.postgres_model, id=pid
+            )
+            assert postgres_one.url == "http://testing.com"
         spider_ins.mysql_model.truncate_table()
         spider_ins.postgres_model.truncate_table()
 

@@ -59,7 +59,7 @@ class TestPostgreSQL:
             target_db=TargetDB.POSTGRES,
         )
         one = await spider_ins.postgres_manager.get(
-            spider_ins.postgres_model, id=randint(1, 11)
+            spider_ins.postgres_model, id=randint(1, 10)
         )
         assert one.url != "http://testing.com"
 
@@ -74,10 +74,11 @@ class TestPostgreSQL:
             target_db=TargetDB.POSTGRES,
             not_update_when_exists=False,
         )
-        one = await spider_ins.postgres_manager.get(
-            spider_ins.postgres_model, id=randint(1, 11)
-        )
-        assert one.url == "http://testing.com"
+        for pid in range(1, 11):
+            one = await spider_ins.postgres_manager.get(
+                spider_ins.postgres_model, id=pid
+            )
+            assert one.url == "http://testing.com"
         spider_ins.postgres_model.truncate_table()
 
     @pytest.mark.dependency(depends=["TestPostgreSQL::test_postgres_update"])

@@ -54,7 +54,7 @@ class TestMySQL:
             not_update_when_exists=True,
         )
         one = await spider_ins.mysql_manager.get(
-            spider_ins.mysql_model, id=randint(1, 11)
+            spider_ins.mysql_model, id=randint(1, 10)
         )
         assert one.url != "http://testing.com"
 
@@ -66,10 +66,10 @@ class TestMySQL:
             after_start=after_start(mysql=mysql),
             not_update_when_exists=False,
         )
-        one = await spider_ins.mysql_manager.get(
-            spider_ins.mysql_model, id=randint(1, 11)
-        )
-        assert one.url == "http://testing.com"
+
+        for mid in range(1, 11):
+            one = await spider_ins.mysql_manager.get(spider_ins.mysql_model, id=mid)
+            assert one.url == "http://testing.com"
         spider_ins.mysql_model.truncate_table()
 
     @pytest.mark.dependency(depends=["TestMySQL::test_mysql_update"])
