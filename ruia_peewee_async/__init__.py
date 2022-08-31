@@ -1,16 +1,18 @@
 # -*- coding: utf-8 -*-
 __version__ = "1.0.4"
-from ssl import SSLContext
-from copy import deepcopy
 from enum import Enum
 from functools import wraps
+from ssl import SSLContext
 from types import MethodType
-from typing import Dict, Optional, Sequence, Tuple, Union
+from typing import Dict
+from typing import Optional as TOptional
+from typing import Sequence, Tuple, Union
 
 from peewee import DoesNotExist, Model, Query
 from peewee_async import Manager, MySQLDatabase, PostgresqlDatabase
 from pymysql import OperationalError
 from ruia import Spider as RuiaSpider
+from schema import And, Optional, Or, Schema, SchemaError, Use
 
 
 class Spider(RuiaSpider):
@@ -28,10 +30,6 @@ class TargetDB(Enum):
     BOTH = 2
 
 
-class ParameterError(Exception):
-    pass
-
-
 def logging(func):
     @wraps(func)
     async def decorator(spider_ins: Spider, callback_result):
@@ -44,7 +42,7 @@ def logging(func):
             spider_ins.logger.error(
                 f"<RuiaPeeweeAsync: {database.name} insert error: {ope}>"
             )
-        except ParameterError as pae:
+        except SchemaError as pae:
             spider_ins.logger.error(pae)
             raise pae
         else:
@@ -53,6 +51,31 @@ def logging(func):
             return result
 
     return decorator
+
+
+def _raise_no_attr(target, fields, pre_msg):
+    for field in fields:
+        if hasattr(target, field):
+            continue
+        raise SchemaError(
+            f"<{pre_msg} error: callback_result should have {field} attribute>"
+        )
+
+
+def _check_result(data: Tuple):
+    target, type_dict, pre_msg = data
+    type_dict: Dict
+    _raise_no_attr(target, type_dict.keys(), pre_msg)
+    for name, vtype in type_dict.items():
+        msg = f"<{pre_msg} error: callback_result's {name} should be a {vtype}>"
+        attr = getattr(target, name)
+        if name in ["data", "query"] and not attr:
+            raise SchemaError(f"<{pre_msg} error: {name} cannot be empty>")
+        if not isinstance(attr, vtype):
+            raise SchemaError(msg)
+
+
+result_validator = Schema(Use(_check_result))
 
 
 class RuiaPeeweeInsert:
@@ -71,19 +94,21 @@ class RuiaPeeweeInsert:
     @staticmethod
     @logging
     async def process(spider_ins: Spider, callback_result):
+        needs_check = (
+            callback_result,
+            {"data": dict, "database": TargetDB},
+            "RuiaPeeweeAsync: insert process",
+        )
+        result_validator.validate(needs_check)
         data = callback_result.data
         database = callback_result.database
-        # msg_pre = f"Success insert data: {data} into "
-        # try:
         if database == TargetDB.MYSQL:
             await spider_ins.mysql_manager.create(spider_ins.mysql_model, **data)
         elif database == TargetDB.POSTGRES:
             await spider_ins.postgres_manager.create(spider_ins.postgres_model, **data)
-        elif database == TargetDB.BOTH:
+        else:
             await spider_ins.mysql_manager.create(spider_ins.mysql_model, **data)
             await spider_ins.postgres_manager.create(spider_ins.postgres_model, **data)
-        else:
-            raise ParameterError(f"<RuiaPeeweeAsync: TargetDB value error: {database}>")
 
 
 class RuiaPeeweeUpdate:
@@ -92,11 +117,11 @@ class RuiaPeeweeUpdate:
     def __init__(
         self,
         data: Dict,
-        query: Union[Query, dict],
+        query: Union[Query, Dict],
         database: TargetDB = TargetDB.MYSQL,
         create_when_not_exists: bool = True,
         not_update_when_exists: bool = True,
-        only: Optional[Sequence[str]] = None,
+        only: TOptional[Sequence[str]] = None,
     ) -> None:
         """
 
@@ -168,10 +193,8 @@ class RuiaPeeweeUpdate:
     ):
         if database == TargetDB.BOTH:
             databases = [TargetDB.MYSQL.name, TargetDB.POSTGRES.name]
-        elif database in [TargetDB.MYSQL, TargetDB.POSTGRES]:
-            databases = [database.name]
         else:
-            raise ParameterError(f"<RuiaPeeweeAsync: TargetDB value error: {database}>")
+            databases = [database.name]
         await RuiaPeeweeUpdate._deal_update(
             spider_ins,
             data,
@@ -191,16 +214,19 @@ class RuiaPeeweeUpdate:
         create_when_not_exists = callback_result.create_when_not_exists
         not_update_when_exists = callback_result.not_update_when_exists
         only = callback_result.only
-        print(type(query))
-        if not query or not isinstance(query, (Query, Dict)):
-            raise ParameterError(
-                f"<RuiaPeeweeAsync: Parameter 'query': {query} has to be a peewee.Query or a dict>"
-            )
-        if only and not isinstance(only, Sequence):
-            raise ParameterError(
-                f"<RuiaPeeweeAsync: Parameter 'only': {only} has to be a Tuple or a List>"
-            )
-        # try:
+        needs_check = (
+            callback_result,
+            {
+                "data": dict,
+                "database": TargetDB,
+                "query": (Query, dict),
+                "create_when_not_exists": bool,
+                "not_update_when_exists": bool,
+                "only": (list, tuple, type(None)),
+            },
+            "RuiaPeeweeAsync: update process",
+        )
+        result_validator.validate(needs_check)
         await RuiaPeeweeUpdate._update(
             spider_ins,
             data,
@@ -236,97 +262,57 @@ def init_spider(*, spider_ins: Spider):
     )
 
 
-def raise_no_model(config, model, name):
-    if config and not model:
-        raise ParameterError(
-            f"""<RuiaPeeweeAsync: {name} must have 'model' in config and 'model' cannot be empty.
-            For example:
-                {{
-                    'host': '127.0.0.1',
-                    'port': 3306,
-                    'user': 'ruiamysql',
-                    'password': 'abc123',
-                    'database': 'ruiamysql',
-                    'model': {{
-                        'table_name': 'ruia_mysql',
-                        "title": CharField(),
-                        'url': CharField(),
-                    }},
-                }}>
-                """
-        )
-
-
-def check_database_config(config: Dict):
-    if not config:
-        return
-    keys = {
-        "user": str,
-        "password": str,
-        "host": str,
-        "port": int,
-        "database": str,
-        "model": Dict,
-        "ssl": SSLContext,
-    }
-    optionals = ["port", "ssl"]
-    for key, value in config.items():
-        if key not in keys and key not in optionals:
-            raise ParameterError(f"<RuiaPeeweeAsync: {key} must in config dict>")
-        if key not in keys and key in optionals:
-            continue
-        vtype = keys[key]
-        if not isinstance(value, vtype):
-            raise ParameterError(f"<RuiaPeeweeAsync: {key}'s type must be {vtype}>")
-        if key == "model":
-            if "table_name" not in value.keys():
-                raise ParameterError(f"<RuiaPeeweeAsync: {key} must in model dict>")
-            if not isinstance(value["table_name"], str):
-                raise ParameterError(
-                    f"<RuiaPeeweeAsync: {key}'s table_name's value must be a str>"
-                )
-
-
 def check_config(kwargs) -> Sequence[Dict]:
-    no_config_msg = """
-            RuiaPeeweeAsync must have a param named mysql_config or postgres_config or both, eg:
-            mysql_config = {
-                'user': 'yourusername',
-                'password': 'yourpassword',
-                'host': '127.0.0.1',
-                'port': 3306,
-                'database': 'ruia_mysql',
-                'model': {{
-                    'table_name': 'ruia_mysql_table',
-                    "title": CharField(),
-                    'url': CharField(),
-                }},
-            }
-            postgres_config = {
-                'user': 'yourusername',
-                'password': 'yourpassword',
-                'host': '127.0.0.1',
-                'port': 5432,
-                'database': 'ruia_postgres',
-                'model': {{
-                    'table_name': 'ruia_postgres_table',
-                    "title": CharField(),
-                    'url': CharField(),
-                }},
-            }
-            """
-    if not kwargs:
-        raise ParameterError(no_config_msg)
-    mysql = kwargs.get("mysql", {})
-    postgres = kwargs.get("postgres", {})
-    if not mysql and not postgres:
-        raise ParameterError(no_config_msg)
-    check_database_config(mysql)
-    check_database_config(postgres)
+    # no_config_msg = """
+    #         RuiaPeeweeAsync must have a param named mysql_config or postgres_config or both, eg:
+    #         mysql_config = {
+    #             'user': 'yourusername',
+    #             'password': 'yourpassword',
+    #             'host': '127.0.0.1',
+    #             'port': 3306,
+    #             'database': 'ruia_mysql',
+    #             'model': {{
+    #                 'table_name': 'ruia_mysql_table',
+    #                 "title": CharField(),
+    #                 'url': CharField(),
+    #             }},
+    #         }
+    #         postgres_config = {
+    #             'user': 'yourusername',
+    #             'password': 'yourpassword',
+    #             'host': '127.0.0.1',
+    #             'port': 5432,
+    #             'database': 'ruia_postgres',
+    #             'model': {{
+    #                 'table_name': 'ruia_postgres_table',
+    #                 "title": CharField(),
+    #                 'url': CharField(),
+    #             }},
+    #         }
+    #         """
+    conf_validator = Schema(
+        {
+            Or("mysql", "postgres"): Or(
+                None,
+                And(
+                    {
+                        "host": And(str),
+                        "user": And(str),
+                        "password": And(str),
+                        "database": And(str),
+                        "model": And({"table_name": And(str), str: object}),
+                        Optional("port"): And(int),
+                        Optional("ssl"): Use(SSLContext),
+                    }
+                ),
+            )
+        }
+    )
+    kwval = conf_validator.validate(kwargs)
+    mysql = kwval.get("mysql", {})
+    postgres = kwval.get("postgres", {})
     mysql_model = mysql.get("model", None)
     postgres_model = postgres.get("model", None)
-    raise_no_model(mysql, mysql_model, "MySQL")
-    raise_no_model(postgres, postgres_model, "PostgreSQL")
     return mysql, mysql_model, postgres, postgres_model
 
 
@@ -347,17 +333,24 @@ def after_start(**kwargs):
 
 
 def create_model(spider_ins=None, create_table=False, **kwargs) -> Tuple:
-    kwcopy = deepcopy(kwargs)
-    mysql, mysql_model, postgres, postgres_model = check_config(kwcopy)
-    mysql_manager, postgres_manager = None, None
+    mysql, postgres = kwargs.get("mysql", {}), kwargs.get("postgres", {})
+    mysql_mconf = mysql.get("model", {})
+    postgres_mconf = postgres.get("model", {})
+    mysql_model, mysql_manager, postgres_model, postgres_manager = (
+        None,
+        None,
+        None,
+        None,
+    )
     if mysql:
-        mysql.pop("model")
-        mysql_db = MySQLDatabase(**mysql)
+        mysql_db = MySQLDatabase(
+            **{key: val for key, val in mysql.items() if key != "model"}
+        )
         mysql_manager = Manager(mysql_db)
         meta = type("Meta", (object,), {"database": mysql_db})
-        table_name = mysql_model.pop("table_name")
-        mysql_model["Meta"] = meta
-        mysql_model = type(table_name, (Model,), mysql_model)
+        table_name = mysql_mconf.pop("table_name")
+        mysql_mconf["Meta"] = meta
+        mysql_model = type(table_name, (Model,), mysql_mconf)
         if spider_ins:
             spider_ins.mysql_db = mysql_db
             spider_ins.mysql_model = mysql_model
@@ -365,14 +358,16 @@ def create_model(spider_ins=None, create_table=False, **kwargs) -> Tuple:
         if create_table:
             with mysql_manager.allow_sync():
                 mysql_model.create_table(True)
+        mysql_mconf["table_name"] = table_name
     if postgres:
-        postgres.pop("model")
-        postgres_db = PostgresqlDatabase(**postgres)
+        postgres_db = PostgresqlDatabase(
+            **{key: val for key, val in postgres.items() if key != "model"}
+        )
         postgres_manager = Manager(postgres_db)
         meta = type("Meta", (object,), {"database": postgres_db})
-        table_name = postgres_model.pop("table_name")
-        postgres_model["Meta"] = meta
-        postgres_model = type(table_name, (Model,), postgres_model)
+        table_name = postgres_mconf.pop("table_name")
+        postgres_mconf["Meta"] = meta
+        postgres_model = type(table_name, (Model,), postgres_mconf)
         if spider_ins:
             spider_ins.postgres_db = postgres_db
             spider_ins.postgres_model = postgres_model
@@ -380,6 +375,7 @@ def create_model(spider_ins=None, create_table=False, **kwargs) -> Tuple:
         if create_table:
             with postgres_manager.allow_sync():
                 postgres_model.create_table(True)
+        postgres_mconf["table_name"] = table_name
     if mysql and not postgres:
         return mysql_model, mysql_manager
     if postgres and not mysql:
