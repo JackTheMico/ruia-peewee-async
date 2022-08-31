@@ -127,11 +127,11 @@ class RuiaPeeweeUpdate:
 
         Args:
             data: A dict that's going to be updated in the database.
-            query: A peewee query or a dict to search for the target data in database.
+            query: A peewee's query or a dict to search for the target data in database.
             database: The target database type.
-            create_when_not_exists: Default is True. If True, will create a record when data not exists.
-            not_update_when_exists: Default is True. If True and record exists, won't update data to records.
-            only: A list or tuple of fields that should be updated.
+            create_when_not_exists: Default is True. If True, will create a record when query can't get the record.
+            not_update_when_exists: Default is True. If True and record exists, won't update data to the records.
+            only: A list or tuple of fields that should be updated only.
 
         """
 
