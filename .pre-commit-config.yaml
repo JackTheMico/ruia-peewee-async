@@ -12,7 +12,7 @@ repos:
       - id: check-merge-conflict
       - id: fix-encoding-pragma
 - repo: https://github.com/psf/black
-  rev: 22.6.0
+  rev: 22.8.0
   hooks:
     - id: black
 - repo: https://github.com/pre-commit/pygrep-hooks
@@ -22,9 +22,15 @@ repos:
     - id: python-no-log-warn
     - id: python-no-eval
 - repo: https://github.com/zricethezav/gitleaks
-  rev: v8.11.0
+  rev: v8.11.2
   hooks:
     - id: gitleaks
+- repo: https://github.com/gitguardian/ggshield
+  rev: v1.13.2
+  hooks:
+    - id: ggshield
+      language_version: python3
+      stages: [commit]
 - repo: local
   hooks:
     - id: pylint
@@ -49,5 +55,5 @@ ci:
     autoupdate_branch: ''
     autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
     autoupdate_schedule: weekly
-    skip: [pylint]
+    skip: [pylint, ggshield]
     submodules: true
