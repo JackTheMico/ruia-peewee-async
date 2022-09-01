@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from os import path
 import typing
 
 from ruia import AttrField, Item, Middleware, Response, TextField
@@ -17,10 +18,13 @@ class DoubanItem(Item):
 
 class DoubanSpider(Spider):
     start_urls = ["https://movie.douban.com/chart"]
-    # aiohttp_kwargs = {"proxy": "http://127.0.0.1:7890"}
 
     async def parse(self, response: Response):
-        async for item in DoubanItem.get_items(html=await response.text()):
+        del response
+        dirpath = path.dirname(__file__)
+        with open(path.join(dirpath, "response.html"), "r", encoding="utf-8") as file:
+            html = file.read()
+        async for item in DoubanItem.get_items(html=html):
             yield item
 
 
@@ -52,9 +56,13 @@ class Update(DoubanSpider):
         is_async_start: bool = False,
         cancel_tasks: bool = True,
         target_db: TargetDB = TargetDB.MYSQL,
+        create_when_not_exists: bool = True,
+        not_update_when_exists: bool = True,
         **spider_kwargs,
     ):
         self.target_db = target_db
+        self.create_when_not_exists = create_when_not_exists
+        self.not_update_when_exists = not_update_when_exists
         super().__init__(
             middleware, loop, is_async_start, cancel_tasks, **spider_kwargs
         )
@@ -68,5 +76,6 @@ class Update(DoubanSpider):
                 res,
                 {"title": res["title"]},
                 self.target_db,
-                not_update_when_exists=False,
+                self.create_when_not_exists,
+                self.not_update_when_exists,
             )

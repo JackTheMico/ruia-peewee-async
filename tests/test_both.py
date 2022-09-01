@@ -26,7 +26,7 @@ def basic_setup(mysql, postgresql):
     mysql.update(
         {
             "model": {
-                "table_name": "ruia_mysql",
+                "table_name": "ruia_mysql_both",
                 "title": CharField(),
                 "url": CharField(),
             }
@@ -35,7 +35,7 @@ def basic_setup(mysql, postgresql):
     postgresql.update(
         {
             "model": {
-                "table_name": "ruia_postgres",
+                "table_name": "ruia_postgres_both",
                 "title": CharField(),
                 "url": CharField(),
             }
@@ -63,32 +63,82 @@ class TestBoth:
         assert count_postgres >= 10, "Should insert 10 rows in PostgreSQL."
 
     @pytest.mark.dependency(depends=["TestBoth::test_both_insert"])
+    async def test_both_not_update_when_exists(self, mysql, postgresql, event_loop):
+        mysql, postgresql = basic_setup(mysql, postgresql)
+        spider_ins = await BothUpdate.async_start(
+            loop=event_loop,
+            after_start=after_start(mysql=mysql, postgres=postgresql),
+            not_update_when_exists=True,
+            target_db=TargetDB.BOTH,
+        )
+        pone = await spider_ins.postgres_manager.get(
+            spider_ins.postgres_model, id=randint(1, 10)
+        )
+        mone = await spider_ins.mysql_manager.get(
+            spider_ins.mysql_model, id=randint(1, 10)
+        )
+        assert pone.url != "http://testing.com"
+        assert mone.url != "http://testing.com"
+
+    @pytest.mark.dependency(depends=["TestBoth::test_both_not_update_when_exists"])
     async def test_both_update(self, mysql, postgresql, event_loop):
         mysql, postgresql = basic_setup(mysql, postgresql)
         spider_ins = await BothUpdate.async_start(
             loop=event_loop,
             after_start=after_start(mysql=mysql, postgres=postgresql),
             target_db=TargetDB.BOTH,
+            not_update_when_exists=False,
         )
-        mysql_one = await spider_ins.mysql_manager.get(
-            spider_ins.mysql_model, id=randint(1, 11)
-        )
-        postgres_one = await spider_ins.postgres_manager.get(
-            spider_ins.postgres_model, id=randint(1, 11)
-        )
-        assert mysql_one.url == "http://testing.com"
-        assert postgres_one.url == "http://testing.com"
+        for mid in range(1, 11):
+            mysql_one = await spider_ins.mysql_manager.get(
+                spider_ins.mysql_model, id=mid
+            )
+            assert mysql_one.url == "http://testing.com"
+        for pid in range(1, 11):
+            postgres_one = await spider_ins.postgres_manager.get(
+                spider_ins.postgres_model, id=pid
+            )
+            assert postgres_one.url == "http://testing.com"
+        spider_ins.mysql_model.truncate_table()
+        spider_ins.postgres_model.truncate_table()
 
-    async def test_both_update_does_not_exist(self, mysql, postgresql, event_loop):
+    @pytest.mark.dependency(depends=["TestBoth::test_both_update"])
+    async def test_both_dont_create_when_not_exists(
+        self, mysql, postgresql, event_loop
+    ):
         mysql, postgresql = basic_setup(mysql, postgresql)
-        mysql["model"]["table_name"] = "ruia_mysql_both_notexist"
-        postgresql["model"]["table_name"] = "ruia_postgres_both_notexist"
         mmodel, _ = create_model(create_table=True, mysql=mysql)
         pmodel, _ = create_model(create_table=True, postgres=postgresql)
         mrows_before = mmodel.select().count()
         prows_before = pmodel.select().count()
-        assert mrows_before <= 3
-        assert prows_before <= 3
+        assert mrows_before == 0
+        assert prows_before == 0
+        spider_ins = await BothUpdate.async_start(
+            loop=event_loop,
+            after_start=after_start(mysql=mysql, postgres=postgresql),
+            target_db=TargetDB.BOTH,
+            create_when_not_exists=False,
+        )
+        while not spider_ins.request_session.closed:
+            await asyncio.sleep(1)
+        mrows_after = await spider_ins.mysql_manager.count(
+            spider_ins.mysql_model.select()
+        )
+        assert mrows_after == 0
+        prows_after = await spider_ins.postgres_manager.count(
+            spider_ins.postgres_model.select()
+        )
+        assert prows_after == 0
+
+    @pytest.mark.dependency(depends=["TestBoth::test_both_dont_create_when_not_exists"])
+    async def test_both_create_when_not_exists(self, mysql, postgresql, event_loop):
+        mysql, postgresql = basic_setup(mysql, postgresql)
+        pmodel, _ = create_model(create_table=True, postgres=postgresql)
+        mmodel, _ = create_model(create_table=True, mysql=mysql)
+        prows_before = pmodel.select().count()
+        mrows_before = mmodel.select().count()
+        assert prows_before == 0
+        assert mrows_before == 0
         spider_ins = await BothUpdate.async_start(
             loop=event_loop,
             after_start=after_start(mysql=mysql, postgres=postgresql),
@@ -96,17 +146,17 @@ class TestBoth:
         )
         while not spider_ins.request_session.closed:
             await asyncio.sleep(1)
-        mrows_after = 0
-        while mrows_after == 0:
-            mrows_after = await spider_ins.mysql_manager.count(
-                spider_ins.mysql_model.select()
-            )
-            await asyncio.sleep(1)
-        assert mrows_after > 0
         prows_after = 0
         while prows_after == 0:
             prows_after = await spider_ins.postgres_manager.count(
                 spider_ins.postgres_model.select()
             )
             await asyncio.sleep(1)
-        assert prows_after > 0
+        assert prows_after == 10
+        mrows_after = 0
+        while mrows_after == 0:
+            mrows_after = await spider_ins.mysql_manager.count(
+                spider_ins.mysql_model.select()
+            )
+            await asyncio.sleep(1)
+        assert mrows_after == 10
