@@ -7,16 +7,35 @@ on:
       - "*"
     paths-ignore:
       - '**/README.md'
+      - '**/pyproject.toml'
   pull_request:
     branches:
       - "*"
     paths-ignore:
       - '**/README.md'
+      - '**/pyproject.toml'
     types:
       - opened
       - reopened
 jobs:
+  pre_job:
+    # continue-on-error: true # Uncomment once integration is finished
+    runs-on: ubuntu-latest
+    # Map a step output to a job output
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@v4
+        with:
+          # All of these options are optional, so you can remove them if you are happy with the defaults
+          concurrent_skipping: 'same_content'
+          skip_after_successful_duplicate: 'true'
+          paths_ignore: '["**/README.md", "**/docs/**", "**/pyproject.toml"]'
+          do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
   build:
+    needs: pre_job
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     runs-on: ubuntu-latest
     name: Codecov Uploader
     steps:
