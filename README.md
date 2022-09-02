@@ -44,7 +44,6 @@ from ruia_peewee_async import (
     after_start,
 )
 
-
 class DoubanItem(Item):
     target_item = TextField(css_select="tr.item")
     title = AttrField(css_select="a.nbg", attr="title")
@@ -53,7 +52,6 @@ class DoubanItem(Item):
     async def clean_title(self, value):
         return value.strip()
 
-
 class DoubanSpider(Spider):
     start_urls = ["https://movie.douban.com/chart"]
     # aiohttp_kwargs = {"proxy": "http://127.0.0.1:7890"}
@@ -61,9 +59,9 @@ class DoubanSpider(Spider):
     async def parse(self, response: Response):
         async for item in DoubanItem.get_items(html=await response.text()):
             yield RuiaPeeweeInsert(item.results)  # default is MySQL
+            # yield RuiaPeeweeInsert(item.results, filters="url")  # use url field(column) to deduplicate, avoid unnecessary insert query executed.
             # yield RuiaPeeweeInsert(item.results, database=TargetDB.POSTGRES) # save to Postgresql
             # yield RuiaPeeweeInsert(item.results, database=TargetDB.BOTH) # save to both MySQL and Postgresql
-
 
 class DoubanUpdateSpider(Spider):
     start_urls = ["https://movie.douban.com/chart"]
@@ -83,11 +81,10 @@ class DoubanUpdateSpider(Spider):
             # data: A dict that's going to be updated in the database.
             # query: A peewee's query or a dict to search for the target data in database.
             # database: The target database type.
+            # filters: A str or List[str] of columns to avoid duplicate data and avoid unnecessary query execute.
             # create_when_not_exists: Default is True. If True, will create a record when query can't get the record.
             # not_update_when_exists: Default is True. If True and record exists, won't update data to the records.
             # only: A list or tuple of fields that should be updated only.
-
-
 mysql = {
     "host": "127.0.0.1",
     "port": 3306,

@@ -50,6 +50,25 @@ def mysql_config():
 
 
 @pytest.fixture(scope="function")
+def pool_mysql_config():
+    return {
+        "host": "somehost",
+        "port": 1234,
+        "user": "ruiamysql",
+        "password": "abc123",
+        "database": "ruiamysql",
+        "pool": True,
+        "min_connections": 5,
+        "max_connections": 20,
+        "model": {
+            "table_name": "test",
+            "some_date": DateField(),
+            "some_char": CharField(),
+        },
+    }
+
+
+@pytest.fixture(scope="function")
 def postgres_config():
     return {
         "host": "somehost",
@@ -57,6 +76,25 @@ def postgres_config():
         "user": "ruiapostgres",
         "password": "abc123",
         "database": "ruiapostgres",
+        "model": {
+            "table_name": "test",
+            "some_date": DateField(),
+            "some_char": CharField(),
+        },
+    }
+
+
+@pytest.fixture(scope="function")
+def pool_postgres_config():
+    return {
+        "host": "somehost",
+        "port": 1234,
+        "user": "ruiamysql",
+        "password": "abc123",
+        "database": "ruiamysql",
+        "pool": True,
+        "min_connections": 5,
+        "max_connections": 20,
         "model": {
             "table_name": "test",
             "some_date": DateField(),

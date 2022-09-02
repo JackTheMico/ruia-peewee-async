@@ -3,9 +3,11 @@
 from copy import deepcopy
 
 import pytest
+from peewee import ModelBase
+from peewee_async import PooledMySQLDatabase, PooledPostgresqlDatabase
 from schema import SchemaError, SchemaMissingKeyError
 
-from ruia_peewee_async import after_start
+from ruia_peewee_async import after_start, create_model
 
 from .common import Insert, RuiaPeeweeInsert, RuiaPeeweeUpdate, TargetDB, Update
 
@@ -23,7 +25,7 @@ def docker_cleansup():
 
 
 class TestConfig:
-    async def test_process_errconifg(
+    async def test_process_errconfig(
         self, event_loop
     ):  # pylint: disable=too-many-statements,too-many-locals
         class Temp:
@@ -32,6 +34,7 @@ class TestConfig:
                 data,
                 database,
                 query=None,
+                filters=None,
                 create_when_not_exists=True,
                 not_update_when_exists=True,
                 only=None,
@@ -39,6 +42,7 @@ class TestConfig:
                 self.data = data
                 self.database = database
                 self.query = query
+                self.filters = filters
                 self.create_when_not_exists = create_when_not_exists
                 self.not_update_when_exists = not_update_when_exists
                 self.only = only
@@ -225,3 +229,26 @@ class TestConfig:
                 loop=event_loop, after_start=after_start(postgres=postgres)
             )
         assert "Key 'model' error:\nMissing key: 'table_name'" in se4.value.args[0]
+
+    async def test_pool_config(
+        self,
+        docker_setup,
+        docker_cleanup,
+        event_loop,
+        pool_mysql_config,
+        pool_postgres_config,
+    ):  # pylint: disable=redefined-outer-name,unused-argument,unknown-option-value
+        (  # pylint: disable=unbalanced-tuple-unpacking
+            mysql_model,
+            mysql_manager,
+            postgres_model,
+            postgres_manager,
+        ) = create_model(mysql=pool_mysql_config, postgres=pool_postgres_config)
+        assert isinstance(mysql_model, ModelBase) is True
+        assert isinstance(postgres_model, ModelBase) is True
+        assert isinstance(mysql_manager.database, PooledMySQLDatabase) is True
+        assert isinstance(postgres_manager.database, PooledPostgresqlDatabase) is True
+        assert mysql_manager.database.min_connections == 5
+        assert mysql_manager.database.max_connections == 20
+        assert postgres_manager.database.min_connections == 5
+        assert postgres_manager.database.max_connections == 20

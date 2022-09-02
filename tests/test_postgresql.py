@@ -50,6 +50,36 @@ class TestPostgreSQL:
         assert count >= 10, "Should insert 10 rows in PostgreSQL."
 
     @pytest.mark.dependency(depends=["TestPostgreSQL::test_postgres_insert"])
+    async def test_postgres_filters_insert(self, postgresql, event_loop, caplog):
+        postgresql = basic_setup(postgresql)
+        spider_ins = await PostgresqlInsert.async_start(
+            loop=event_loop,
+            after_start=after_start(postgres=postgresql),
+            target_db=TargetDB.POSTGRES,
+            filters="url",
+        )
+        assert "was filtered by filters" in caplog.text
+        spider_ins = await PostgresqlInsert.async_start(
+            loop=event_loop,
+            after_start=after_start(postgres=postgresql),
+            target_db=TargetDB.POSTGRES,
+            filters=["url", "title"],
+        )
+        assert "was filtered by filters" in caplog.text
+        spider_ins = await PostgresqlInsert.async_start(
+            loop=event_loop,
+            after_start=after_start(postgres=postgresql),
+            target_db=TargetDB.POSTGRES,
+            filters="url",
+            yield_origin=False,
+        )
+        assert "wasn't filtered by filters" in caplog.text
+        one = await spider_ins.postgres_manager.get(
+            spider_ins.postgres_model, url="http://testinginsert.com"
+        )
+        assert one.url == "http://testinginsert.com"
+
+    @pytest.mark.dependency(depends=["TestPostgreSQL::test_postgres_filters_insert"])
     async def test_postgres_not_update_when_exists(self, postgresql, event_loop):
         postgresql = basic_setup(postgresql)
         spider_ins = await PostgresqlUpdate.async_start(
@@ -62,6 +92,37 @@ class TestPostgreSQL:
             spider_ins.postgres_model, id=randint(1, 10)
         )
         assert one.url != "http://testing.com"
+
+    @pytest.mark.dependency(
+        depends=["TestPostgreSQL::test_postgres_not_update_when_exists"]
+    )
+    async def test_postgres_filters(self, postgresql, event_loop, caplog):
+        postgresql = basic_setup(postgresql)
+        spider_ins = await PostgresqlUpdate.async_start(
+            loop=event_loop,
+            after_start=after_start(postgres=postgresql),
+            filters="url",
+            not_update_when_exists=True,
+            target_db=TargetDB.POSTGRES,
+        )
+        assert "wasn't filtered by filters" in caplog.text
+        rows = await spider_ins.postgres_manager.count(
+            spider_ins.postgres_model.select()
+        )
+        assert rows == 20
+        spider_ins = await PostgresqlUpdate.async_start(
+            loop=event_loop,
+            after_start=after_start(postgres=postgresql),
+            filters=["url", "title"],
+            not_update_when_exists=True,
+            target_db=TargetDB.POSTGRES,
+            yield_origin=True,
+        )
+        assert "was filtered by filters" in caplog.text
+        rows = await spider_ins.postgres_manager.count(
+            spider_ins.postgres_model.select()
+        )
+        assert rows == 20
 
     @pytest.mark.dependency(
         depends=["TestPostgreSQL::test_postgres_not_update_when_exists"]

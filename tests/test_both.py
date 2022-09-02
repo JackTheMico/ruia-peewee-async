@@ -63,6 +63,46 @@ class TestBoth:
         assert count_postgres >= 10, "Should insert 10 rows in PostgreSQL."
 
     @pytest.mark.dependency(depends=["TestBoth::test_both_insert"])
+    async def test_both_filters_insert(self, mysql, postgresql, event_loop, caplog):
+        mysql, postgresql = basic_setup(mysql, postgresql)
+        spider_ins = await BothInsert.async_start(
+            loop=event_loop,
+            after_start=after_start(mysql=mysql, postgres=postgresql),
+            filters="url",
+            target_db=TargetDB.BOTH,
+        )
+        assert "was filtered by filters" in caplog.text
+        spider_ins = await BothInsert.async_start(
+            loop=event_loop,
+            after_start=after_start(mysql=mysql, postgres=postgresql),
+            filters=["url", "title"],
+            target_db=TargetDB.BOTH,
+        )
+        assert "was filtered by filters" in caplog.text
+        mrows = await spider_ins.mysql_manager.count(spider_ins.mysql_model.select())
+        prows = await spider_ins.postgres_manager.count(
+            spider_ins.postgres_model.select()
+        )
+        assert mrows == 10
+        assert prows == 10
+        spider_ins = await BothInsert.async_start(
+            loop=event_loop,
+            after_start=after_start(mysql=mysql, postgres=postgresql),
+            filters="url",
+            target_db=TargetDB.BOTH,
+            yield_origin=False,
+        )
+        assert "wasn't filtered by filters" in caplog.text
+        mone = await spider_ins.mysql_manager.get(
+            spider_ins.mysql_model, url="http://testinginsert.com"
+        )
+        assert mone.url == "http://testinginsert.com"
+        pone = await spider_ins.postgres_manager.get(
+            spider_ins.postgres_model, url="http://testinginsert.com"
+        )
+        assert pone.url == "http://testinginsert.com"
+
+    @pytest.mark.dependency(depends=["TestBoth::test_both_filters_insert"])
     async def test_both_not_update_when_exists(self, mysql, postgresql, event_loop):
         mysql, postgresql = basic_setup(mysql, postgresql)
         spider_ins = await BothUpdate.async_start(
@@ -79,6 +119,39 @@ class TestBoth:
         )
         assert pone.url != "http://testing.com"
         assert mone.url != "http://testing.com"
+
+    @pytest.mark.dependency(depends=["TestBoth::test_both_not_update_when_exists"])
+    async def test_both_filters(self, mysql, postgresql, event_loop, caplog):
+        mysql, postgresql = basic_setup(mysql, postgresql)
+        spider_ins = await BothUpdate.async_start(
+            loop=event_loop,
+            after_start=after_start(mysql=mysql, postgres=postgresql),
+            filters="url",
+            not_update_when_exists=True,
+            target_db=TargetDB.BOTH,
+        )
+        assert "wasn't filtered by filters" in caplog.text
+        mrows = await spider_ins.mysql_manager.count(spider_ins.mysql_model.select())
+        prows = await spider_ins.postgres_manager.count(
+            spider_ins.postgres_model.select()
+        )
+        assert mrows == 20
+        assert prows == 20
+        spider_ins = await BothUpdate.async_start(
+            loop=event_loop,
+            after_start=after_start(mysql=mysql, postgres=postgresql),
+            filters=["url", "title"],
+            not_update_when_exists=True,
+            yield_origin=True,
+            target_db=TargetDB.BOTH,
+        )
+        assert "was filtered by filters" in caplog.text
+        mrows = await spider_ins.mysql_manager.count(spider_ins.mysql_model.select())
+        prows = await spider_ins.postgres_manager.count(
+            spider_ins.postgres_model.select()
+        )
+        assert mrows == 20
+        assert prows == 20
 
     @pytest.mark.dependency(depends=["TestBoth::test_both_not_update_when_exists"])
     async def test_both_update(self, mysql, postgresql, event_loop):
