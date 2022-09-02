@@ -2,11 +2,21 @@ name: Codecov
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - "*"
+    paths-ignore:
+      - 'README.md'
+      - '**/README.md'
+      - 'pyproject.toml'
+      - '**/pyproject.toml'
   pull_request:
     branches:
       - "*"
     paths-ignore:
+      - 'README.md'
       - '**/README.md'
+      - 'pyproject.toml'
       - '**/pyproject.toml'
     types:
       - opened
