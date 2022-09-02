@@ -4,7 +4,7 @@ from enum import Enum
 from functools import wraps
 from ssl import SSLContext
 from types import MethodType
-from typing import Dict, Callable
+from typing import Callable, Dict
 from typing import Optional as TOptional
 from typing import Sequence, Tuple, Union
 
@@ -375,6 +375,13 @@ def check_config(kwargs) -> Sequence[Dict]:
                         "model": And({"table_name": And(str), str: object}),
                         Optional("port"): And(int),
                         Optional("ssl"): Use(SSLContext),
+                        Optional("pool"): And(bool),
+                        Optional("min_connections"): And(
+                            int, lambda mic: 1 <= mic <= 10
+                        ),
+                        Optional("max_connections"): And(
+                            int, lambda mac: 10 < mac <= 20
+                        ),
                     }
                 ),
             )
@@ -415,8 +422,18 @@ def create_model(spider_ins=None, create_table=False, **kwargs) -> Tuple:
         None,
     )
     if mysql:
-        mysql_db = MySQLDatabase(
-            **{key: val for key, val in mysql.items() if key != "model"}
+        mysql_db = (
+            PooledMySQLDatabase(
+                **{
+                    key: val
+                    for key, val in mysql.items()
+                    if key not in ("model", "pool")
+                }
+            )
+            if "pool" in mysql
+            else MySQLDatabase(
+                **{key: val for key, val in mysql.items() if key != "model"}
+            )
         )
         mysql_manager = Manager(mysql_db)
         meta = type("Meta", (object,), {"database": mysql_db})
@@ -432,8 +449,18 @@ def create_model(spider_ins=None, create_table=False, **kwargs) -> Tuple:
                 mysql_model.create_table(True)
         mysql_mconf["table_name"] = table_name
     if postgres:
-        postgres_db = PostgresqlDatabase(
-            **{key: val for key, val in postgres.items() if key != "model"}
+        postgres_db = (
+            PooledPostgresqlDatabase(
+                **{
+                    key: val
+                    for key, val in postgres.items()
+                    if key not in ("model", "pool")
+                }
+            )
+            if "pool" in postgres
+            else PostgresqlDatabase(
+                **{key: val for key, val in postgres.items() if key != "model"}
+            )
         )
         postgres_manager = Manager(postgres_db)
         meta = type("Meta", (object,), {"database": postgres_db})
