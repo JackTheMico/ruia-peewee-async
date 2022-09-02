@@ -3,7 +3,7 @@
 from copy import deepcopy
 
 import pytest
-from peewee import Model
+from peewee import ModelBase
 from peewee_async import PooledMySQLDatabase, PooledPostgresqlDatabase
 from schema import SchemaError, SchemaMissingKeyError
 
@@ -244,8 +244,8 @@ class TestConfig:
             postgres_model,
             postgres_manager,
         ) = create_model(mysql=pool_mysql_config, postgres=pool_postgres_config)
-        assert isinstance(mysql_model, Model) is True
-        assert isinstance(postgres_model, Model) is True
+        assert isinstance(mysql_model, ModelBase) is True
+        assert isinstance(postgres_model, ModelBase) is True
         assert isinstance(mysql_manager.database, PooledMySQLDatabase) is True
         assert isinstance(postgres_manager.database, PooledPostgresqlDatabase) is True
         assert mysql_manager.database.min_connections == 5
