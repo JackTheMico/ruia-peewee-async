@@ -23,7 +23,7 @@ def docker_cleansup():
 
 
 class TestConfig:
-    async def test_process_errconifg(
+    async def test_process_errconfig(
         self, event_loop
     ):  # pylint: disable=too-many-statements,too-many-locals
         class Temp:
@@ -32,6 +32,7 @@ class TestConfig:
                 data,
                 database,
                 query=None,
+                filters=None,
                 create_when_not_exists=True,
                 not_update_when_exists=True,
                 only=None,
@@ -39,6 +40,7 @@ class TestConfig:
                 self.data = data
                 self.database = database
                 self.query = query
+                self.filters = filters
                 self.create_when_not_exists = create_when_not_exists
                 self.not_update_when_exists = not_update_when_exists
                 self.only = only
