@@ -96,7 +96,17 @@ async def filter_func(data, spider_ins, database, manager, model, filters) -> bo
     filtered = False
     filter_res = getattr(spider_ins, f"{database}_filters")
     for fil in filters:
-        if data[fil] in [getattr(x, fil) for x in filter_res]:
+        fil_res = [getattr(x, fil) for x in filter_res]
+        if not fil_res:
+            continue
+        outfil = data[fil]
+        if not isinstance(outfil, type(fil_res[0])):
+            outfil = (
+                filter_res[0]  # pylint: disable=protected-access
+                ._meta.columns[fil]
+                .adapt(outfil)
+            )
+        if outfil in fil_res:
             filtered = True
     return filtered
 
@@ -374,7 +384,7 @@ def check_config(kwargs) -> Sequence[Dict]:
                         "database": And(str),
                         "model": And({"table_name": And(str), str: object}),
                         Optional("port"): And(int),
-                        Optional("ssl"): Use(SSLContext),
+                        Optional("ssl"): And(SSLContext),
                         Optional("pool"): And(bool),
                         Optional("min_connections"): And(
                             int, lambda mic: 1 <= mic <= 10

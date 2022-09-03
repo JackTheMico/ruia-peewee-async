@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
+import ssl
 from copy import deepcopy
+from contextlib import contextmanager
 
 import pytest
 from peewee import ModelBase
@@ -22,6 +24,14 @@ def docker_setup():
 @pytest.fixture(scope="class")
 def docker_cleansup():
     return False
+
+
+@contextmanager
+def not_raises(exception):
+    try:
+        yield
+    except exception as exc:
+        raise pytest.fail(f"DID RAISE {exception}") from exc
 
 
 class TestConfig:
@@ -252,3 +262,16 @@ class TestConfig:
         assert mysql_manager.database.max_connections == 20
         assert postgres_manager.database.min_connections == 5
         assert postgres_manager.database.max_connections == 20
+
+    async def test_config(
+        self, docker_setup, docker_cleanup, event_loop, mysql_config, postgres_config
+    ):  # pylint: disable=redefined-outer-name,unused-argument,unknown-option-value
+        ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+        ctx.check_hostname = False
+        ctx.load_verify_locations(cafile="/etc/ssl/certs/ca-certificates.crt")
+        postgres_config["ssl"] = ctx
+        mysql_config["ssl"] = ctx
+        with not_raises(SchemaError):
+            after_start(mysql=mysql_config)
+        with not_raises(SchemaError):
+            after_start(postgres=postgres_config)
