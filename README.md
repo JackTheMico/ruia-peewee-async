@@ -121,18 +121,26 @@ There's a `create_model` method to create the Peewee model based on database con
 ```python
 from ruia_peewee_async import create_model
 
-model = create_model(mysql=mysql) # or postgres=postgres or both
+mysql_model, mysql_manager, postgres_model, postgres_manager = create_model(mysql=mysql) # or postgres=postgres or both
 # create the table at the same time
-model = create_mode(postgres=postgres, create_table=True)
-rows = model.select().count()
+mysql_model, mysql_manager, postgres_model, postgres_manager = create_model(mysql=mysql, create_table=True) # or postgres=postgres or both
+rows = mysql_model.select().count()
 print(rows)
 ```
 
 And class `Spider` from `ruia_peewee_async` has attributes below related to database you can use.
 ```python
 from peewee import Model
-from typing import Dict
-from peewee_async import Manager, MySQLDatabase, PostgresqlDatabase
+from typing import Callable, Dict
+from typing import Optional as TOptional
+from peewee_async import (
+    AsyncQueryWrapper,
+    Manager,
+    MySQLDatabase,
+    PooledMySQLDatabase,
+    PooledPostgresqlDatabase,
+    PostgresqlDatabase,
+)
 from ruia import Spider as RuiaSpider
 
 class Spider(RuiaSpider):
@@ -142,6 +150,8 @@ class Spider(RuiaSpider):
     postgres_manager: Manager
     mysql_db: MySQLDatabase
     postgres_db: PostgresqlDatabase
+    mysql_filters: TOptional[AsyncQueryWrapper]
+    postgres_filters: TOptional[AsyncQueryWrapper]
 ```
 For more information, check out [peewee's documentation](http://docs.peewee-orm.com/en/latest/) and [peewee-async's documentation](https://peewee-async.readthedocs.io/en/latest/).
 
