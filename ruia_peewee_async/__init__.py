@@ -420,6 +420,7 @@ def after_start(**kwargs):
 
     return init_after_start
 
+
 @pytest.mark.no_cover
 async def before_stop(spider_ins):
     if hasattr(spider_ins, "postgres_manager"):
