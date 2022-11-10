@@ -8,8 +8,9 @@ from ruia_peewee_async import (
     Spider,
     TargetDB,
     after_start,
-    before_stop
+    before_stop,
 )
+
 
 class DoubanItem(Item):
     target_item = TextField(css_select="tr.item")
@@ -18,6 +19,7 @@ class DoubanItem(Item):
 
     async def clean_title(self, value):
         return value.strip()
+
 
 class DoubanSpider(Spider):
     start_urls = ["https://movie.douban.com/chart"]
@@ -31,6 +33,7 @@ class DoubanSpider(Spider):
 
             # yield RuiaPeeweeInsert(item.results, database=TargetDB.POSTGRES) # save to Postgresql
             # yield RuiaPeeweeInsert(item.results, database=TargetDB.BOTH) # save to both MySQL and Postgresql
+
 
 class DoubanUpdateSpider(Spider):
     start_urls = ["https://movie.douban.com/chart"]
@@ -54,6 +57,7 @@ class DoubanUpdateSpider(Spider):
             # create_when_not_exists: Default is True. If True, will create a record when query can't get the record.
             # not_update_when_exists: Default is True. If True and record exists, won't update data to the records.
             # only: A list or tuple of fields that should be updated only.
+
 
 mysql = {
     "host": "127.0.0.1",
@@ -82,9 +86,8 @@ postgres = {
 
 if __name__ == "__main__":
     spider = DoubanSpider.start(
-            after_start=after_start(mysql=mysql),
-            before_stop=before_stop
-            )
+        after_start=after_start(mysql=mysql), before_stop=before_stop
+    )
     # DoubanSpider.start(after_start=after_start(postgres=postgres))
     # DoubanSpider.start(after_start=after_start(mysql=mysql, postgres=postgres))
     # DoubanUpdateSpider.start(after_start=after_start(mysql=mysql))
