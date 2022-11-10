@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-__version__ = "1.0.4"
 from enum import Enum
 from functools import wraps
 from ssl import SSLContext
@@ -8,6 +7,7 @@ from typing import Callable, Dict
 from typing import Optional as TOptional
 from typing import Sequence, Tuple, Union
 
+import pytest
 from peewee import DoesNotExist, Model, Query
 from peewee_async import (
     AsyncQueryWrapper,
@@ -419,6 +419,14 @@ def after_start(**kwargs):
         init_spider(spider_ins=spider_ins)
 
     return init_after_start
+
+
+@pytest.mark.no_cover
+async def before_stop(spider_ins):
+    if hasattr(spider_ins, "postgres_manager"):
+        await spider_ins.postgres_manager.close()
+    if hasattr(spider_ins, "mysql_manager"):
+        await spider_ins.mysql_manager.close()
 
 
 def create_model(spider_ins=None, create_table=False, **kwargs) -> Tuple:

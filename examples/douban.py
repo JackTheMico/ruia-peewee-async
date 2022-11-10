@@ -8,6 +8,7 @@ from ruia_peewee_async import (
     Spider,
     TargetDB,
     after_start,
+    before_stop,
 )
 
 
@@ -84,7 +85,7 @@ postgres = {
 }
 
 if __name__ == "__main__":
-    DoubanSpider.start(after_start=after_start(mysql=mysql))
+    DoubanSpider.start(after_start=after_start(mysql=mysql), before_stop=before_stop)
     # DoubanSpider.start(after_start=after_start(postgres=postgres))
     # DoubanSpider.start(after_start=after_start(mysql=mysql, postgres=postgres))
     # DoubanUpdateSpider.start(after_start=after_start(mysql=mysql))
