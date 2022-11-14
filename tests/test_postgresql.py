@@ -5,7 +5,7 @@ from random import randint
 import pytest
 from peewee import CharField
 
-from ruia_peewee_async import TargetDB, after_start, create_model
+from ruia_peewee_async import TargetDB, after_start, create_model, before_stop
 
 from .common import Insert, Update
 
@@ -109,7 +109,7 @@ class TestPostgreSQL:
         rows = await spider_ins.postgres_manager.count(
             spider_ins.postgres_model.select()
         )
-        assert rows == 20
+        assert rows == 11
         spider_ins = await PostgresqlUpdate.async_start(
             loop=event_loop,
             after_start=after_start(postgres=postgresql),
@@ -122,7 +122,7 @@ class TestPostgreSQL:
         rows = await spider_ins.postgres_manager.count(
             spider_ins.postgres_model.select()
         )
-        assert rows == 20
+        assert rows == 11
 
     @pytest.mark.dependency(
         depends=["TestPostgreSQL::test_postgres_not_update_when_exists"]
@@ -166,7 +166,6 @@ class TestPostgreSQL:
     )
     async def test_postgres_create_when_not_exists(self, postgresql, event_loop):
         postgresql = basic_setup(postgresql)
-        # postgresql["model"]["table_name"] = "ruia_postgres_notexist"
         model, _ = create_model(create_table=True, postgres=postgresql)
         rows_before = model.select().count()
         assert rows_before == 0
@@ -184,3 +183,23 @@ class TestPostgreSQL:
             )
             await asyncio.sleep(1)
         assert rows_after == 10
+
+    @pytest.mark.dependency(
+        depends=["TestPostgreSQL::test_postgres_create_when_not_exists"]
+    )
+    async def test_postgres_before_stop(self, postgresql, event_loop, caplog):
+        postgresql = basic_setup(postgresql)
+        await PostgresqlInsert.async_start(
+            loop=event_loop,
+            after_start=after_start(postgres=postgresql),
+            target_db=TargetDB.POSTGRES,
+            before_stop=before_stop,
+        )
+        await PostgresqlUpdate.async_start(
+            loop=event_loop,
+            after_start=after_start(postgres=postgresql),
+            target_db=TargetDB.POSTGRES,
+            before_stop=before_stop,
+        )
+        assert "RuntimeError" not in caplog.text
+        assert "Exception" not in caplog.text

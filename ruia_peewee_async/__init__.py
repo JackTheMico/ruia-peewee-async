@@ -7,7 +7,6 @@ from typing import Callable, Dict
 from typing import Optional as TOptional
 from typing import Sequence, Tuple, Union
 
-import pytest
 from peewee import DoesNotExist, Model, Query
 from peewee_async import (
     AsyncQueryWrapper,
@@ -88,27 +87,15 @@ def _check_result(data: Tuple):
 result_validator = Schema(Use(_check_result))
 
 
-async def filter_func(data, spider_ins, database, manager, model, filters) -> bool:
-    if not hasattr(spider_ins, f"{database}_filters"):
-        conditions = [getattr(model, fil) for fil in filters]
-        filter_res = await manager.execute(model.select(*conditions).distinct())
-        setattr(spider_ins, f"{database}_filters", filter_res)
-    filtered = False
-    filter_res = getattr(spider_ins, f"{database}_filters")
-    for fil in filters:
-        fil_res = [getattr(x, fil) for x in filter_res]
-        if not fil_res:
-            continue
-        outfil = data[fil]
-        if not isinstance(outfil, type(fil_res[0])):
-            outfil = (
-                filter_res[0]  # pylint: disable=protected-access
-                ._meta.columns[fil]
-                .adapt(outfil)
-            )
-        if outfil in fil_res:
-            filtered = True
-    return filtered
+async def filter_func(data, manager, model, filters) -> bool:
+    conditions = [getattr(model, fil) for fil in filters]
+    query = {x.name: data[x.name] for x in conditions}
+    try:
+        await manager.get(model, **query)
+    except DoesNotExist:
+        return False
+    else:
+        return True
 
 
 class RuiaPeeweeInsert:
@@ -154,9 +141,7 @@ class RuiaPeeweeInsert:
             manager: Manager = getattr(spider_ins, f"{database}_manager")
             model: Model = getattr(spider_ins, f"{database}_model")
             if filters:
-                filtered = await filter_func(
-                    data, spider_ins, database, manager, model, filters
-                )
+                filtered = await filter_func(data, manager, model, filters)
                 if filtered:
                     msg += (
                         f"<RuiaPeeweeAsync: data: {data} was filtered by filters: {filters},"
@@ -226,9 +211,7 @@ class RuiaPeeweeUpdate:
             manager: Manager = getattr(spider_ins, f"{database}_manager")
             model: Model = getattr(spider_ins, f"{database}_model")
             if filters:
-                filtered = await filter_func(
-                    data, spider_ins, database, manager, model, filters
-                )
+                filtered = await filter_func(data, manager, model, filters)
                 if filtered:
                     msg += f"<RuiaPeeweeAsync: data: {data} was filtered by filters: {filters}\n"
                     continue
@@ -421,7 +404,6 @@ def after_start(**kwargs):
     return init_after_start
 
 
-@pytest.mark.no_cover
 async def before_stop(spider_ins):
     if hasattr(spider_ins, "postgres_manager"):
         await spider_ins.postgres_manager.close()
