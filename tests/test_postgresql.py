@@ -9,15 +9,18 @@ from ruia_peewee_async import TargetDB, after_start, create_model, before_stop
 
 from .common import Insert, Update
 
+
 class PostgresqlInsert(Insert):
     async def parse(self, response):
         async for item in super().parse(response):
             yield item
 
+
 class PostgresqlUpdate(Update):
     async def parse(self, response):
         async for item in super().parse(response):
             yield item
+
 
 def basic_setup(postgresql):
     postgresql.update(
@@ -30,6 +33,7 @@ def basic_setup(postgresql):
         }
     )
     return postgresql
+
 
 class TestPostgreSQL:
     @pytest.mark.dependency()
@@ -189,13 +193,13 @@ class TestPostgreSQL:
             loop=event_loop,
             after_start=after_start(postgres=postgresql),
             target_db=TargetDB.POSTGRES,
-            before_stop=before_stop
+            before_stop=before_stop,
         )
         await PostgresqlUpdate.async_start(
             loop=event_loop,
             after_start=after_start(postgres=postgresql),
             target_db=TargetDB.POSTGRES,
-            before_stop=before_stop
+            before_stop=before_stop,
         )
-        assert 'RuntimeError' not in caplog.text
-        assert 'Exception' not in caplog.text
+        assert "RuntimeError" not in caplog.text
+        assert "Exception" not in caplog.text

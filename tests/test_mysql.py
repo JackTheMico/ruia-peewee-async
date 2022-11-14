@@ -9,15 +9,18 @@ from ruia_peewee_async import after_start, create_model, before_stop
 
 from .common import Insert, Update
 
+
 class MySQLInsert(Insert):
     async def parse(self, response):
         async for item in super().parse(response):
             yield item
 
+
 class MySQLUpdate(Update):
     async def parse(self, response):
         async for item in super().parse(response):
             yield item
+
 
 def basic_setup(mysql):
     mysql.update(
@@ -30,6 +33,7 @@ def basic_setup(mysql):
         }
     )
     return mysql
+
 
 class TestMySQL:
     @pytest.mark.dependency()
@@ -158,20 +162,18 @@ class TestMySQL:
             await asyncio.sleep(1)
         assert rows_after == 10
 
-    @pytest.mark.dependency(
-        depends=["TestMySQL::test_mysql_create_when_not_exists"]
-    )
+    @pytest.mark.dependency(depends=["TestMySQL::test_mysql_create_when_not_exists"])
     async def test_mysql_before_stop(self, mysql, event_loop, caplog):
         mysql = basic_setup(mysql)
         await MySQLInsert.async_start(
             loop=event_loop,
             after_start=after_start(mysql=mysql),
-            before_stop=before_stop
+            before_stop=before_stop,
         )
         await MySQLUpdate.async_start(
             loop=event_loop,
             after_start=after_start(mysql=mysql),
-            before_stop=before_stop
+            before_stop=before_stop,
         )
-        assert 'RuntimeError' not in caplog.text
-        assert 'Exception' not in caplog.text
+        assert "RuntimeError" not in caplog.text
+        assert "Exception" not in caplog.text

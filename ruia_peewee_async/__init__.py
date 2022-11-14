@@ -20,6 +20,7 @@ from pymysql import OperationalError
 from ruia import Spider as RuiaSpider
 from schema import And, Optional, Or, Schema, SchemaError, Use
 
+
 class Spider(RuiaSpider):
     mysql_model: Model
     mysql_manager: Manager
@@ -32,10 +33,12 @@ class Spider(RuiaSpider):
     process_insert_callback_result: Callable
     process_update_callback_result: Callable
 
+
 class TargetDB(Enum):
     MYSQL = 0
     POSTGRES = 1
     BOTH = 2
+
 
 def logging(func):
     @wraps(func)
@@ -58,6 +61,7 @@ def logging(func):
 
     return decorator
 
+
 def _raise_no_attr(target, fields, pre_msg):
     for field in fields:
         if hasattr(target, field):
@@ -65,6 +69,7 @@ def _raise_no_attr(target, fields, pre_msg):
         raise SchemaError(
             f"<{pre_msg} error: callback_result should have {field} attribute>"
         )
+
 
 def _check_result(data: Tuple):
     target, type_dict, pre_msg = data
@@ -78,7 +83,9 @@ def _check_result(data: Tuple):
         if not isinstance(attr, vtype):
             raise SchemaError(msg)
 
+
 result_validator = Schema(Use(_check_result))
+
 
 async def filter_func(data, manager, model, filters) -> bool:
     conditions = [getattr(model, fil) for fil in filters]
@@ -89,6 +96,7 @@ async def filter_func(data, manager, model, filters) -> bool:
         return False
     else:
         return True
+
 
 class RuiaPeeweeInsert:
     def __init__(
@@ -133,9 +141,7 @@ class RuiaPeeweeInsert:
             manager: Manager = getattr(spider_ins, f"{database}_manager")
             model: Model = getattr(spider_ins, f"{database}_model")
             if filters:
-                filtered = await filter_func(
-                    data, manager, model, filters
-                )
+                filtered = await filter_func(data, manager, model, filters)
                 if filtered:
                     msg += (
                         f"<RuiaPeeweeAsync: data: {data} was filtered by filters: {filters},"
@@ -150,6 +156,7 @@ class RuiaPeeweeInsert:
         if msg:
             return msg
         return f"<RuiaPeeweeAsync: Success insert {data} into database: {databases}>"
+
 
 class RuiaPeeweeUpdate:
     """Ruia Peewee Update Class"""
@@ -204,9 +211,7 @@ class RuiaPeeweeUpdate:
             manager: Manager = getattr(spider_ins, f"{database}_manager")
             model: Model = getattr(spider_ins, f"{database}_model")
             if filters:
-                filtered = await filter_func(
-                    data, manager, model, filters
-                )
+                filtered = await filter_func(data, manager, model, filters)
                 if filtered:
                     msg += f"<RuiaPeeweeAsync: data: {data} was filtered by filters: {filters}\n"
                     continue
@@ -297,6 +302,7 @@ class RuiaPeeweeUpdate:
         )
         return result
 
+
 def init_spider(*, spider_ins: Spider):
     mysql_config = getattr(spider_ins, "mysql_config", {})
     postgres_config = getattr(spider_ins, "postgres_config", {})
@@ -319,6 +325,7 @@ def init_spider(*, spider_ins: Spider):
     spider_ins.callback_result_map.update(
         {"RuiaPeeweeUpdate": "process_update_callback_result"}
     )
+
 
 def check_config(kwargs) -> Sequence[Dict]:
     # no_config_msg = """
@@ -380,6 +387,7 @@ def check_config(kwargs) -> Sequence[Dict]:
     postgres_model = postgres.get("model", None)
     return mysql, mysql_model, postgres, postgres_model
 
+
 def after_start(**kwargs):
     mysql, mysql_model, postgres, postgres_model = check_config(kwargs)
 
@@ -395,11 +403,13 @@ def after_start(**kwargs):
 
     return init_after_start
 
+
 async def before_stop(spider_ins):
     if hasattr(spider_ins, "postgres_manager"):
         await spider_ins.postgres_manager.close()
     if hasattr(spider_ins, "mysql_manager"):
         await spider_ins.mysql_manager.close()
+
 
 def create_model(spider_ins=None, create_table=False, **kwargs) -> Tuple:
     mysql, postgres = kwargs.get("mysql", {}), kwargs.get("postgres", {})
