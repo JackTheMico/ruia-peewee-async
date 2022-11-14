@@ -5,22 +5,19 @@ from random import randint
 import pytest
 from peewee import CharField
 
-from ruia_peewee_async import TargetDB, after_start, create_model
+from ruia_peewee_async import TargetDB, after_start, create_model, before_stop
 
 from .common import Insert, Update
-
 
 class BothInsert(Insert):
     async def parse(self, response):
         async for item in super().parse(response):
             yield item
 
-
 class BothUpdate(Update):
     async def parse(self, response):
         async for item in super().parse(response):
             yield item
-
 
 def basic_setup(mysql, postgresql):
     mysql.update(
@@ -42,7 +39,6 @@ def basic_setup(mysql, postgresql):
         }
     )
     return mysql, postgresql
-
 
 class TestBoth:
     @pytest.mark.dependency()
@@ -135,8 +131,8 @@ class TestBoth:
         prows = await spider_ins.postgres_manager.count(
             spider_ins.postgres_model.select()
         )
-        assert mrows == 20
-        assert prows == 20
+        assert mrows == 11
+        assert prows == 11
         spider_ins = await BothUpdate.async_start(
             loop=event_loop,
             after_start=after_start(mysql=mysql, postgres=postgresql),
@@ -150,8 +146,8 @@ class TestBoth:
         prows = await spider_ins.postgres_manager.count(
             spider_ins.postgres_model.select()
         )
-        assert mrows == 20
-        assert prows == 20
+        assert mrows == 11
+        assert prows == 11
 
     @pytest.mark.dependency(depends=["TestBoth::test_both_not_update_when_exists"])
     async def test_both_update(self, mysql, postgresql, event_loop):
@@ -233,3 +229,21 @@ class TestBoth:
             )
             await asyncio.sleep(1)
         assert mrows_after == 10
+
+    @pytest.mark.dependency(depends=["TestBoth::test_both_create_when_not_exists"])
+    async def test_both_before_stop(self, mysql, postgresql, event_loop, caplog):
+        mysql, postgresql = basic_setup(mysql, postgresql)
+        await BothInsert.async_start(
+            loop=event_loop,
+            after_start=after_start(mysql=mysql, postgres=postgresql),
+            target_db=TargetDB.BOTH,
+            before_stop=before_stop
+        )
+        await BothUpdate.async_start(
+            loop=event_loop,
+            after_start=after_start(mysql=mysql, postgres=postgresql),
+            target_db=TargetDB.BOTH,
+            before_stop=before_stop
+        )
+        assert 'RuntimeError' not in caplog.text
+        assert 'Exception' not in caplog.text
