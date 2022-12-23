@@ -42,17 +42,27 @@ jobs:
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     runs-on: ubuntu-latest
     name: Codecov Uploader
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python-version: "3.6"
+          - python-version: "3.7"
+          - python-version: "3.8"
+          - python-version: "3.9"
+          - python-version: "3.10"
     steps:
       - uses: actions/checkout@v3
       - name: Install poetry
         run: pipx install poetry
-      - uses: actions/setup-python@v4
+      - name: Set up python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.7.9'
+          python-version: ${{ matrix.python-version }}
           cache: 'poetry'
       - run: |
           poetry install && poetry install -E aiomysql -E aiopg
-      - name: Run tests and collect coverage
+      - name: Run ${{ matrix.python-version }} tests and collect coverage
         run: poetry run pytest --cov . --cov-report=xml
       - name: Upload coverage reports to Codecov with GitHub Action
-        uses: codecov/codecov-action@v3
+        uses: codecov/coecov-action@v3
