@@ -65,4 +65,4 @@ jobs:
       - name: Run ${{ matrix.python-version }} tests and collect coverage
         run: poetry run pytest --cov . --cov-report=xml
       - name: Upload coverage reports to Codecov with GitHub Action
-        uses: codecov/coecov-action@v3
+        uses: codecov/codecov-action@v3
