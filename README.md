@@ -2,6 +2,11 @@
 [![996.icu](https://img.shields.io/badge/link-996.icu-red.svg)](https://996.icu)
 [![LICENSE](https://img.shields.io/badge/license-Anti%20996-blue.svg)](https://github.com/996icu/996.ICU/blob/master/LICENSE)
 
+[![Testing on main branch](https://github.com/JackTheMico/ruia-peewee-async/actions/workflows/codecov.yml/badge.svg?branch=main)](https://github.com/JackTheMico/ruia-peewee-async/actions/workflows/codecov.yml)
+[![Testing on develop branch](https://github.com/JackTheMico/ruia-peewee-async/actions/workflows/codecov.yml/badge.svg?branch=develop)](https://github.com/JackTheMico/ruia-peewee-async/actions/workflows/codecov.yml)
+
+[![Semantic Release](https://github.com/JackTheMico/ruia-peewee-async/actions/workflows/release.yml/badge.svg)](https://github.com/JackTheMico/ruia-peewee-async/actions/workflows/release.yml)
+
 A [Ruia](https://github.com/howie6879/ruia) plugin that uses [peewee-async](https://github.com/05bit/peewee-async) to store data to MySQL or PostgreSQL or both of them.
 
 
