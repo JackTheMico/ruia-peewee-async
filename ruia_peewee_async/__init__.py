@@ -392,7 +392,6 @@ def after_start(**kwargs):
     mysql, mysql_model, postgres, postgres_model = check_config(kwargs)
 
     async def init_after_start(spider_ins):
-
         if mysql and mysql_model:
             spider_ins.mysql_config = mysql
             # spider_ins.mysql_model = mysql_model
